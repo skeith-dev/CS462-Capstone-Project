@@ -1,7 +1,7 @@
 //
 // Created through the efforts of Connor Kamrowski, Spencer Keith, and Jennifer Curry
 //
-//CHECK TODO flag in comments for unfinished code
+//CHECK TODO-Packet_size
 //
 
 #include <iostream>
@@ -53,6 +53,7 @@ int main() {
 	//TODO
 	//situationalErrorsPrompt();
 	file_path = userStringPrompt("Input path of file to transfer:");
+	std::cout<<std::endl;
 
 	//connect socket for sending packets, listening for acks
 	//	use ports 9000-9999
@@ -96,26 +97,29 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
     }
 	
 	int num_packets = openFile();
+	bool sent[num_packets] = { 0 };
 	bool received[num_packets] = { 0 };
 	
 	//Don't take poseidon down, just keep this failsafe implemented in case something fails but it keeps running
 	int FAILSAFE = 0;
-    while(FAILSAFE < 1000000000 && iterator < num_packets) {
+    while(FAILSAFE < 1000000000) {
 		FAILSAFE++;
 
-		//More packets were needed, send the last packet and quit
-        if(iterator >= sequence_range) {
+        if(iterator >= sequence_range || iterator+1 >= num_packets) {//TODO-Packet_size
             sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
 			cout << "Final sequence number reached." << std::endl;
             break;
         }
 
 		//send the packet
-		sendPacket(clientSocket, iterator);
+		if (sent[iterator] == false){
+			sendPacket(clientSocket, iterator);
+			sent[iterator] = true;
+		}
 
         Packet myAck{};
 
-        if(recv(clientSocket, &myAck, sizeof(myAck), MSG_DONTWAIT)) {
+        if(recv(clientSocket, &myAck, sizeof(myAck), MSG_DONTWAIT) > 0) {
             std::cout << "Received ack #" << myAck.sequenceNumber << std::endl;
             iterator++;
 			received[myAck.sequenceNumber] = true;
@@ -134,6 +138,16 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
     std::chrono::duration<double> elapsedSeconds = endTime - startTime;
     std::cout << std::endl << "Total execution time = " << elapsedSeconds.count() << std::endl;
 
+/*
+	bool waiting = true;
+	while(true){
+		int result = recv(client_fd, &waiting, sizeof(waiting), MSG_DONTWAIT);
+		if (result > 0 && waiting == false) {
+			std::cout << "done" << std::endl;
+			break;
+		}
+	}
+*/
     close(client_fd);
 
 }
@@ -185,14 +199,15 @@ void sendPacket(int clientSocket, int sequenceNumber) {
 
 	int result = send(clientSocket, &myPacket, sizeof(myPacket), 0);
 	
-	cout << "result of send:" << result << std::endl;
+	//cout << "result of send:" << result << std::endl;
 
-	std::cout << "Sent Packet #" << myPacket.sequenceNumber << ": [ ";
+	std::cout << "Sent Packet #" << myPacket.sequenceNumber << std::endl;
+/*	std::cout << "Sent Packet #" << myPacket.sequenceNumber << ": [ ";
 	for(int i = 0; i < packet_size; i++) {
 		std::cout << myPacket.contents[i];
 	}
 	std::cout << " ]" << std::endl;
-
+*/
 }
 
 

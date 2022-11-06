@@ -167,7 +167,8 @@ void executeSRProtocol(int serverSocket, int clientSize) {
 
     }
 	
-	std::cout << "Successfully received file." << std::endl;
+	std::cout << ":" << std::endl << "Successfully received file." << std::endl;
+	close(serverSocket);
 
 }
 
