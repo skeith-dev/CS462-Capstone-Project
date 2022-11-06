@@ -94,17 +94,17 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
 	
 	//Don't take poseidon down, just keep this failsafe implemented in case something fails but it keeps running
 	int FAILSAFE = 0;
-    while(FAILSAFE < 1000) {
+    while(FAILSAFE < 1000000000) {
 		FAILSAFE++;
 
         if(iterator >= sequence_range) {
             sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
+			cout << "Final sequence number reached." << std::endl;
             break;
         }
 
 		//send the packet
 		sendPacket(clientSocket, iterator);
-
 
         Packet myAck{};
 
@@ -115,7 +115,7 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
 
     }
 
-	if(FAILSAFE >= 1000000){
+	if(FAILSAFE >= 1000000000){
 		std::cout << std::endl << "Program timed out (failsafe for Poseidon stopped the code)." << std::endl;
 		exit(0);
 	}
@@ -175,7 +175,9 @@ void sendPacket(int clientSocket, int sequenceNumber) {
 
     myPacket.valid = true;
 
-	send(clientSocket, &myPacket, sizeof(myPacket), 0);
+	int result = send(clientSocket, &myPacket, sizeof(myPacket), 0);
+	
+	cout << "result of send:" << result << std::endl;
 
 	std::cout << "Sent Packet #" << myPacket.sequenceNumber << ": [ ";
 	for(int i = 0; i < packet_size; i++) {

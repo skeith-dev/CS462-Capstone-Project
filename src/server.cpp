@@ -4,7 +4,11 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
+
 #include "packet.h"
+
+#define FINAL_SEQUENCE_NUMBER -1
 
 
 int portNum; //port number of the target server
@@ -12,10 +16,17 @@ int packetSize; //specified size of packets to be sent
 int slidingWindowSize;  //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
 std::string filePath;
 
+std::string filePathPrompt();
+int portNumPrompt();
+int packetSizePrompt();
+void writePacketToFile(bool append, const std::string& message);
+void executeSRProtocol(int serverSocket, int clientSize);
+void sendAck(int serverSocket, int sequenceNumber);
+
 
 using namespace std;
 
-void main() {
+int main() {
 	
 	portNum = portNumPrompt();
 	packetSize = packetSizePrompt();
@@ -28,11 +39,22 @@ void main() {
 		return -1;
 	}
 	
+    int opt = 1;
+    // Forcefully attaching socket to the port
+    if (setsockopt(serverSocket, SOL_SOCKET,
+                   SO_REUSEADDR | SO_REUSEPORT, &opt,
+                   sizeof(opt))) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+	
+    struct sockaddr_in serverAddress = {0};
+	
 	//bind the socket to an ip address and port
 	serverAddress.sin_family = AF_INET;
+    serverAddress.sin_addr.s_addr = INADDR_ANY; //TEST
 	serverAddress.sin_port = htons(portNum);
-	
-	
+
 	if (bind(serverSocket, (sockaddr*)&serverAddress, sizeof(serverAddress)) == -1){
 		cerr << "can't bind to port";
 		return -2;
@@ -45,22 +67,22 @@ void main() {
 	
 	//wait for connection
 	sockaddr_in client;
-	soclen_t slientSize = sizeof(client);
-	int clientSocket = accept(listening, (socketaddr*)&client, &clientSize);
-	if(slientSocket == -1){
+	socklen_t clientSize = sizeof(client);
+	int clientSocket = accept(serverSocket, (sockaddr*)&client, &clientSize);
+	if(clientSocket == -1){
 		cerr << "Problem with client connecting";
 		return -4;
 	}
 	
 	//close listening socket
-	close(serverSocket);
+	close(clientSocket);
 	
 	//start recieving
-	executeSAW_GBNProtocol(serverSocket, clientAddress, clientSize);
+	executeSRProtocol(serverSocket, clientSize);
 	
 	
 	//close socket
-	close(clientSocket);
+	close(serverSocket);
 	
 }
 
@@ -111,14 +133,20 @@ void writePacketToFile(bool append, const std::string& message) {
 
 }
 
-void executeSAW_GBNProtocol(int serverSocket, sockaddr_in clientAddress, int clientSize) {
+void executeSRProtocol(int serverSocket, int clientSize) {
 
-    iterator = 0;
-    while(true) {
+    int iterator = 0;
+	
+	int FAILSAFE = 0;
+    while(FAILSAFE < 1000000000) {
+		FAILSAFE++;
 
         Packet myPacket{};
 
-        if(recvfrom(serverSocket, &myPacket, sizeof(myPacket), MSG_DONTWAIT, (struct sockaddr*)&clientAddress, reinterpret_cast<socklen_t *>(&clientSize)) != -1) {
+		int result = recv(serverSocket, &myPacket, sizeof(myPacket), MSG_DONTWAIT);
+		std::cout << "Result of recv(): " << result << endl;
+
+		if(result) {//MSG_DONTWAIT
 
             if(myPacket.sequenceNumber == FINAL_SEQUENCE_NUMBER) {
                 break;
@@ -130,16 +158,29 @@ void executeSAW_GBNProtocol(int serverSocket, sockaddr_in clientAddress, int cli
             }
             std::cout << " ]" << std::endl;
 
-            if(myPacket.valid && myPacket.sequenceNumber == iterator) {
-                //sendAck(serverSocket, clientAddress, iterator);
+            if(myPacket.sequenceNumber == iterator) {
+                sendAck(serverSocket, iterator);
                 writePacketToFile(true, myPacket.contents);
                 iterator++;
             } else {
                 std::cout << "Received packet is corrupted!" << std::endl;
             }
-
+			
         }
 
     }
 
 }
+
+void sendAck(int serverSocket, int sequenceNumber) {
+
+    Packet myAck{};
+    myAck.sequenceNumber = sequenceNumber;
+    myAck.valid = true;
+	int result = send(serverSocket, &myAck, sizeof(myAck), 0);
+	std::cout << "Result of send: " << result << std::endl; //REMOVE, THESE ARE FOR DEBUGGING
+    std::cout << "Sent Ack #" << myAck.sequenceNumber << std::endl;
+
+}
+
+
