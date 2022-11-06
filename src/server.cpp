@@ -75,14 +75,14 @@ int main() {
 	}
 	
 	//close listening socket
-	close(clientSocket);
+	close(serverSocket);
 	
 	//start recieving
-	executeSRProtocol(serverSocket, clientSize);
+	executeSRProtocol(clientSocket, clientSize);
 	
 	
 	//close socket
-	close(serverSocket);
+	close(clientSocket);
 	
 }
 
@@ -143,11 +143,8 @@ void executeSRProtocol(int serverSocket, int clientSize) {
 
         Packet myPacket{};
 
-		int result = recv(serverSocket, &myPacket, sizeof(myPacket), MSG_DONTWAIT);
-		std::cout << "Result of recv(): " << result << endl;
-
-		if(result) {//MSG_DONTWAIT
-
+		if(recv(serverSocket, &myPacket, sizeof(myPacket), MSG_DONTWAIT) > 0) {
+			
             if(myPacket.sequenceNumber == FINAL_SEQUENCE_NUMBER) {
                 break;
             }
@@ -169,6 +166,8 @@ void executeSRProtocol(int serverSocket, int clientSize) {
         }
 
     }
+	
+	std::cout << "Successfully received file." << std::endl;
 
 }
 

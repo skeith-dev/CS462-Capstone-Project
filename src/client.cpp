@@ -31,6 +31,9 @@ int userIntegerPrompt(std::string request);
 
 void executeSRProtocol(int clientSocket, sockaddr_in server_address);
 
+int openFile();
+
+
 //Variable definitions
 int packet_size, timeout_interval, window_size, sequence_range, port_num;
 std::string file_path; //path to file to be sent
@@ -76,27 +79,31 @@ int main() {
  */
 void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
 
+	//iterator to count the number of packets sent
+    int iterator = 0;
+	int client_fd;
+
 	//create time_points for start and end
     std::chrono::system_clock::time_point startTime;
     std::chrono::system_clock::time_point endTime;
 	//log the starting time
     startTime = std::chrono::system_clock::now();
-
-	//iterator to count the number of packets sent
-    int iterator = 0;
-	int client_fd;
 	
 	//connect to the server
     if ((client_fd = connect(clientSocket, (struct sockaddr*)&server_address, sizeof(server_address))) < 0) {
         printf("\nConnection Failed \n");
         exit(0);
-    }	
+    }
+	
+	int num_packets = openFile();
+	bool received[num_packets] = { 0 };
 	
 	//Don't take poseidon down, just keep this failsafe implemented in case something fails but it keeps running
 	int FAILSAFE = 0;
-    while(FAILSAFE < 1000000000) {
+    while(FAILSAFE < 1000000000 && iterator < num_packets) {
 		FAILSAFE++;
 
+		//More packets were needed, send the last packet and quit
         if(iterator >= sequence_range) {
             sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
 			cout << "Final sequence number reached." << std::endl;
@@ -110,9 +117,10 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
 
         if(recv(clientSocket, &myAck, sizeof(myAck), MSG_DONTWAIT)) {
             std::cout << "Received ack #" << myAck.sequenceNumber << std::endl;
-            iterator = myAck.sequenceNumber + 1;
+            iterator++;
+			received[myAck.sequenceNumber] = true;
         }
-
+	
     }
 
 	if(FAILSAFE >= 1000000000){
@@ -216,3 +224,27 @@ int userIntegerPrompt(std::string request) {
 
 }
 
+/*
+ * openFile calculates the number of packets that will be sent
+ */
+int openFile() {
+
+    std::ifstream fileInputStream;
+
+    fileInputStream.open(file_path, std::ios_base::in | std::ios_base::binary);
+    if (fileInputStream.fail()) {
+        throw std::fstream::failure("Failed while opening file " + file_path);
+    }
+
+    fileInputStream.seekg(0, fileInputStream.end);
+    int fileSize = (int) fileInputStream.tellg();
+    int fileSizeRangeOfSequenceNumbers = fileSize / packet_size + fileSize % packet_size;
+
+//    std::cout << std::endl << "File to deliver: " << file_path << std::endl << "File size: " << fileSize << " bytes" << std::endl << std::endl;
+	//"good practice would be enter packet size in mb, bytes, etc"
+
+    fileInputStream.close();
+	
+	return fileSizeRangeOfSequenceNumbers;
+
+}
