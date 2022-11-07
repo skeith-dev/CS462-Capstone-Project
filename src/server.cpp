@@ -28,8 +28,11 @@ using namespace std;
 
 int main() {
 	
-	portNum = portNumPrompt();
-	filePath = filePathPrompt();
+	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
+
+	port_num = userIntegerPrompt("Input port number (9000-9999):");
+	file_path = userStringPrompt("Input path for file to write to:");
+	std::cout<<std::endl;
 	
 	//create a socket
 	int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
