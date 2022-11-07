@@ -29,7 +29,6 @@ using namespace std;
 int main() {
 	
 	portNum = portNumPrompt();
-	packetSize = packetSizePrompt();
 	filePath = filePathPrompt();
 	
 	//create a socket
@@ -100,17 +99,6 @@ std::string filePathPrompt() {
 int portNumPrompt() {
 
     std::cout << "What is the port number of the target server:" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int packetSizePrompt() {
-
-    std::cout << "Size of packets:" << std::endl;
 
     std::string responseString;
     std::getline(std::cin, responseString);
