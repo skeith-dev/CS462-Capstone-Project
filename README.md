@@ -20,5 +20,5 @@ Sequence range
 .txt file that you want to transfer
 
 For reciever enter the prompted information:
-Packet size
 Port number
+path for file to write to as a .txt
