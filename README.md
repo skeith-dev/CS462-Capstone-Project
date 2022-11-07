@@ -8,3 +8,17 @@ This repository is the capstone project of the Computer Science Comprehensive Ma
 
 ## Instructions
 To run the code, perform the following steps:
+
+make
+./reciever.out
+./sender.out
+
+For sender enter the prompted information:
+Packet size
+Port number
+Sequence range
+.txt file that you want to transfer
+
+For reciever enter the prompted information:
+Packet size
+Port number
