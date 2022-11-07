@@ -35,7 +35,7 @@ int openFile();
 
 
 //Variable definitions
-int packet_size, timeout_interval, window_size, sequence_range, port_num;
+int packet_size, timeout_interval, window_size, sequence_range, port_num, num_packets;
 std::string file_path; //path to file to be sent
 Packet myPacket;
 
@@ -96,7 +96,8 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
         exit(0);
     }
 	
-	int num_packets = openFile();
+	num_packets = openFile();
+	std::cout << std::endl << "Num packets:" << num_packets << std::endl;
 	bool sent[num_packets] = { 0 };
 	bool received[num_packets] = { 0 };
 	
@@ -167,6 +168,7 @@ void writeFileToPacket(int sequenceNumber) {
 
     //create char array for file contents
     char contents[packet_size];
+
     //read file contents into array of amount packet_size
     fileInputStream.read(contents, packet_size);
 
@@ -201,7 +203,9 @@ void sendPacket(int clientSocket, int sequenceNumber) {
 	
 	//cout << "result of send:" << result << std::endl;
 
-	std::cout << "Sent Packet #" << myPacket.sequenceNumber << std::endl;
+	if (myPacket.sequenceNumber != -1) {
+		std::cout << "Sent Packet #" << myPacket.sequenceNumber << std::endl;
+	}
 /*	std::cout << "Sent Packet #" << myPacket.sequenceNumber << ": [ ";
 	for(int i = 0; i < packet_size; i++) {
 		std::cout << myPacket.contents[i];
@@ -253,9 +257,13 @@ int openFile() {
 
     fileInputStream.seekg(0, fileInputStream.end);
     int fileSize = (int) fileInputStream.tellg();
-    int fileSizeRangeOfSequenceNumbers = fileSize / packet_size + fileSize % packet_size;
+    int fileSizeRangeOfSequenceNumbers = fileSize / packet_size + 1;
+	
+	if (fileSizeRangeOfSequenceNumbers < 1) {
+		fileSizeRangeOfSequenceNumbers = 1;
+	} else if ((fileSize % packet_size) > 0) fileSizeRangeOfSequenceNumbers++;
 
-//    std::cout << std::endl << "File to deliver: " << file_path << std::endl << "File size: " << fileSize << " bytes" << std::endl << std::endl;
+    std::cout << std::endl << "File to deliver: " << file_path << std::endl << "File size: " << fileSize << " bytes" << std::endl << std::endl;
 	//"good practice would be enter packet size in mb, bytes, etc"
 
     fileInputStream.close();
