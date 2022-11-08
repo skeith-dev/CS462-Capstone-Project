@@ -23,11 +23,11 @@ using namespace std;
 //Function definitions
 void writeFileToPacket(int sequenceNumber);
 
-int sendPacket(int clientSocket, int sequenceNumber);
+void sendPacket(int clientSocket, int sequenceNumber);
 
 std::string userStringPrompt(std::string request);
 
-int userIntegerPrompt(std::string request, bool restricted, int min, int max);
+int userIntegerPrompt(std::string request);
 
 void executeSRProtocol(int clientSocket, sockaddr_in server_address);
 
@@ -45,11 +45,11 @@ int main() {
 	//take user input
 	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
 
-	packet_size = userIntegerPrompt("Input desired packet size (bytes):", true, 1, 500000);
-	port_num = userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
+	packet_size = userIntegerPrompt("Input packet size:");
+	port_num = userIntegerPrompt("Input port number (9000-9999):");
 	//timeout_interval = userIntegerPrompt("Input timeout interval:");
 	//window_size = userIntegerPrompt("Input window size:");
-	sequence_range = userIntegerPrompt("Input sequence range:", true, 1, 9999999);
+	sequence_range = userIntegerPrompt("Input sequence range:");
 	//TODO
 	//situationalErrorsPrompt();
 	file_path = userStringPrompt("Input path of file to transfer:");
@@ -97,27 +97,24 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
     }
 	
 	num_packets = openFile();
-	//std::cout << std::endl << "Num packets:" << num_packets << std::endl;
+	std::cout << std::endl << "Num packets:" << num_packets << std::endl;
 	bool sent[num_packets] = { 0 };
 	bool received[num_packets] = { 0 };
-
-	double sent_data;
-
+	
 	//Don't take poseidon down, just keep this failsafe implemented in case something fails but it keeps running
 	int FAILSAFE = 0;
     while(FAILSAFE < 1000000000) {
 		FAILSAFE++;
 
         if(iterator >= sequence_range || iterator+1 >= num_packets) {//TODO-Packet_size
-			//temp is to accept the integer without doing anything with the value.
-            int temp = sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
-			//cout << "Final sequence number reached." << std::endl;
+            sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
+			cout << "Final sequence number reached." << std::endl;
             break;
         }
 
 		//send the packet
 		if (sent[iterator] == false){
-			sent_data += sendPacket(clientSocket, iterator);
+			sendPacket(clientSocket, iterator);
 			sent[iterator] = true;
 		}
 
@@ -136,14 +133,11 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
 		exit(0);
 	}
 	
-	std::cout << ":" << std::endl << ":" << std::endl << "Session successfully terminated" << std::endl;
+	std::cout << std::endl << std::endl << "Successfully Transmitted" << std::endl;
 
     endTime = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsedSeconds = endTime - startTime;
-    std::cout << std::endl << "Number of packets sent: " << iterator << std::endl;
-    std::cout << "Total execution time: " << elapsedSeconds.count() << std::endl;
-    std::cout << "Total throughput (bps): " << sent_data/elapsedSeconds.count() << std::endl;
-
+    std::cout << std::endl << "Total execution time = " << elapsedSeconds.count() << std::endl;
 
 /*
 	bool waiting = true;
@@ -183,11 +177,11 @@ void writeFileToPacket(int sequenceNumber) {
     if(myPacket.sequenceNumber != FINAL_SEQUENCE_NUMBER) {
         //copy the contents of the array to the global packet struct char vector
         for (int i = 0; i < packet_size; i++) {
-            myPacket.contents[i] = contents[i];
+			myPacket.contents[i] = contents[i];
         }
     } else {
         for (int i = 0; i < packet_size; i++) {
-            myPacket.contents[i] = '\0';
+            myPacket.contents[0] = '\0';
         }
     }
 
@@ -199,7 +193,7 @@ void writeFileToPacket(int sequenceNumber) {
  * sendPacket sends the packet to the server
  *
  */
-int sendPacket(int clientSocket, int sequenceNumber) {
+void sendPacket(int clientSocket, int sequenceNumber) {
 
     writeFileToPacket(sequenceNumber);
 
@@ -212,8 +206,6 @@ int sendPacket(int clientSocket, int sequenceNumber) {
 	if (myPacket.sequenceNumber != -1) {
 		std::cout << "Sent Packet #" << myPacket.sequenceNumber << std::endl;
 	}
-
-	return result;
 /*	std::cout << "Sent Packet #" << myPacket.sequenceNumber << ": [ ";
 	for(int i = 0; i < packet_size; i++) {
 		std::cout << myPacket.contents[i];
@@ -240,17 +232,12 @@ std::string userStringPrompt(std::string request) {
 /*
  * userIntegerPrompt handles any user input where the returned value is an integer
  */
-int userIntegerPrompt(std::string request, bool restricted, int min, int max) {
+int userIntegerPrompt(std::string request) {
+
+	std::cout << request << std::endl;
 
 	std::string responseString;
-	std::cout << request << std::endl;
-	std::getline(std::cin, responseString);		
-	if (restricted) {
-		while (std::stoi(responseString) < min || std::stoi(responseString) > max) {
-			std::cout << "Input must be between " << min << " and " << max << std::endl;
-			std::getline(std::cin, responseString);
-		}
-	}
+	std::getline(std::cin, responseString);
 
 	return std::stoi(responseString);
 
