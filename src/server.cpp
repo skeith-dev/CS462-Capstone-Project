@@ -22,6 +22,9 @@ int packetSizePrompt();
 void writePacketToFile(bool append, const std::string& message);
 void executeSRProtocol(int serverSocket, int clientSize);
 void sendAck(int serverSocket, int sequenceNumber);
+std::string userStringPrompt(std::string request);
+int userIntegerPrompt(std::string request);
+
 
 
 using namespace std;
@@ -30,8 +33,8 @@ int main() {
 	
 	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
 
-	port_num = userIntegerPrompt("Input port number (9000-9999):");
-	file_path = userStringPrompt("Input path for file to write to:");
+	portNum = userIntegerPrompt("Input port number (9000-9999):");
+	filePath = userStringPrompt("Enter path for file to write to:");
 	std::cout<<std::endl;
 	
 	//create a socket
@@ -140,11 +143,11 @@ void executeSRProtocol(int serverSocket, int clientSize) {
                 break;
             }
 
-            std::cout << "Received packet #" << myPacket.sequenceNumber << "! [ ";
-            for(int i = 0; i < packetSize; i++) {
+            std::cout << "Packet " << myPacket.sequenceNumber << " recieved" << std::endl;
+            /*for(int i = 0; i < packetSize; i++) {
                 std::cout << myPacket.contents[i];
             }
-            std::cout << " ]" << std::endl;
+            std::cout << " ]" << std::endl;*/
 
             if(myPacket.sequenceNumber == iterator) {
                 sendAck(serverSocket, iterator);
@@ -158,7 +161,7 @@ void executeSRProtocol(int serverSocket, int clientSize) {
 
     }
 	
-	std::cout << ":" << std::endl << "Successfully received file." << std::endl;
+	//std::cout << ":" << std::endl << "Successfully received file." << std::endl;
 	close(serverSocket);
 
 }
@@ -169,9 +172,35 @@ void sendAck(int serverSocket, int sequenceNumber) {
     myAck.sequenceNumber = sequenceNumber;
     myAck.valid = true;
 	int result = send(serverSocket, &myAck, sizeof(myAck), 0);
-	std::cout << "Result of send: " << result << std::endl; //REMOVE, THESE ARE FOR DEBUGGING
-    std::cout << "Sent Ack #" << myAck.sequenceNumber << std::endl;
+	//std::cout << "Result of send: " << result << std::endl; //REMOVE, THESE ARE FOR DEBUGGING
+    std::cout << "Ack " << myAck.sequenceNumber << " sent" << std::endl;
 
 }
 
+/*
+ * filePathPrompt takes the path to the file (to be sent) and saves it as a string
+ */
+std::string userStringPrompt(std::string request) {
 
+	std::cout << request << std::endl;
+
+	std::string responseString;
+	std::getline(std::cin, responseString);
+
+	return responseString;
+
+}
+
+/*
+ * userIntegerPrompt handles any user input where the returned value is an integer
+ */
+int userIntegerPrompt(std::string request) {
+
+	std::cout << request << std::endl;
+
+	std::string responseString;
+	std::getline(std::cin, responseString);
+
+	return std::stoi(responseString);
+
+}
