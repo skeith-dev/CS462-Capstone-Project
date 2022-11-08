@@ -23,7 +23,7 @@ using namespace std;
 //Function definitions
 void writeFileToPacket(int sequenceNumber);
 
-void sendPacket(int clientSocket, int sequenceNumber);
+int sendPacket(int clientSocket, int sequenceNumber);
 
 std::string userStringPrompt(std::string request);
 
@@ -199,7 +199,7 @@ void writeFileToPacket(int sequenceNumber) {
  * sendPacket sends the packet to the server
  *
  */
-void sendPacket(int clientSocket, int sequenceNumber) {
+int sendPacket(int clientSocket, int sequenceNumber) {
 
     writeFileToPacket(sequenceNumber);
 
@@ -212,6 +212,7 @@ void sendPacket(int clientSocket, int sequenceNumber) {
 	if (myPacket.sequenceNumber != -1) {
 		std::cout << "Sent Packet #" << myPacket.sequenceNumber << std::endl;
 	}
+	return result;
 /*	std::cout << "Sent Packet #" << myPacket.sequenceNumber << ": [ ";
 	for(int i = 0; i < packet_size; i++) {
 		std::cout << myPacket.contents[i];
