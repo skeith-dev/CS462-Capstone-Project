@@ -160,7 +160,7 @@ void executeSRProtocol(int serverSocket, int clientSize) {
         }
 
     }
-	
+	std::cout << "Last packet seq# received: " << iterator - 1 << std::endl;
 	//std::cout << ":" << std::endl << "Successfully received file." << std::endl;
 	close(serverSocket);
 
