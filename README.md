@@ -25,7 +25,7 @@ For reciever enter the prompted information:
 Port number
 path for file to write to as a .txt
 
-After receiver information is entered
+After receiver information has been entered (press enter after typing file output path)
 
 For sender enter the prompted information:
 Packet size
