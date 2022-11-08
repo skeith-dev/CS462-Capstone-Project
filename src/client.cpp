@@ -45,7 +45,7 @@ int main() {
 	//take user input
 	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
 
-	packet_size = userIntegerPrompt("Input desired packet size (bytes):", true, 1, 500000);
+	packet_size = userIntegerPrompt("Input desired packet size (bytes):", true, 1, 23333);
 	port_num = userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
 	//timeout_interval = userIntegerPrompt("Input timeout interval:");
 	//window_size = userIntegerPrompt("Input window size:");
@@ -97,24 +97,27 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
     }
 	
 	num_packets = openFile();
-	std::cout << std::endl << "Num packets:" << num_packets << std::endl;
+	//std::cout << std::endl << "Num packets:" << num_packets << std::endl;
 	bool sent[num_packets] = { 0 };
 	bool received[num_packets] = { 0 };
-	
+
+	double sent_data;
+
 	//Don't take poseidon down, just keep this failsafe implemented in case something fails but it keeps running
 	int FAILSAFE = 0;
     while(FAILSAFE < 1000000000) {
 		FAILSAFE++;
 
         if(iterator >= sequence_range || iterator+1 >= num_packets) {//TODO-Packet_size
-            sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
-			cout << "Final sequence number reached." << std::endl;
+			//temp is to accept the integer without doing anything with the value.
+            int temp = sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
+			//cout << "Final sequence number reached." << std::endl;
             break;
         }
 
 		//send the packet
 		if (sent[iterator] == false){
-			sendPacket(clientSocket, iterator);
+			sent_data += sendPacket(clientSocket, iterator);
 			sent[iterator] = true;
 		}
 
@@ -133,11 +136,14 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
 		exit(0);
 	}
 	
-	std::cout << std::endl << std::endl << "Successfully Transmitted" << std::endl;
+	std::cout << ":" << std::endl << ":" << std::endl << "Session successfully terminated" << std::endl;
 
     endTime = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsedSeconds = endTime - startTime;
-    std::cout << std::endl << "Total execution time = " << elapsedSeconds.count() << std::endl;
+    std::cout << std::endl << "Number of packets sent: " << iterator << std::endl;
+    std::cout << "Total execution time: " << elapsedSeconds.count() << std::endl;
+    std::cout << "Total throughput (bps): " << sent_data/elapsedSeconds.count() << std::endl;
+
 
 /*
 	bool waiting = true;
