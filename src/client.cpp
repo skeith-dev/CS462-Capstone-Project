@@ -27,7 +27,7 @@ void sendPacket(int clientSocket, int sequenceNumber);
 
 std::string userStringPrompt(std::string request);
 
-int userIntegerPrompt(std::string request);
+int userIntegerPrompt(std::string request, bool restricted, int min, int max);
 
 void executeSRProtocol(int clientSocket, sockaddr_in server_address);
 
@@ -45,11 +45,11 @@ int main() {
 	//take user input
 	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
 
-	packet_size = userIntegerPrompt("Input packet size:");
-	port_num = userIntegerPrompt("Input port number (9000-9999):");
+	packet_size = userIntegerPrompt("Input desired packet size (bytes):", true, 1, 500000);
+	port_num = userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
 	//timeout_interval = userIntegerPrompt("Input timeout interval:");
 	//window_size = userIntegerPrompt("Input window size:");
-	sequence_range = userIntegerPrompt("Input sequence range:");
+	sequence_range = userIntegerPrompt("Input sequence range:", true, 1, 9999999);
 	//TODO
 	//situationalErrorsPrompt();
 	file_path = userStringPrompt("Input path of file to transfer:");
@@ -232,12 +232,17 @@ std::string userStringPrompt(std::string request) {
 /*
  * userIntegerPrompt handles any user input where the returned value is an integer
  */
-int userIntegerPrompt(std::string request) {
-
-	std::cout << request << std::endl;
+int userIntegerPrompt(std::string request, bool restricted, int min, int max) {
 
 	std::string responseString;
-	std::getline(std::cin, responseString);
+	std::cout << request << std::endl;
+	std::getline(std::cin, responseString);		
+	if (restricted) {
+		while (std::stoi(responseString) < min || std::stoi(responseString) > max) {
+			std::cout << std::endl << "Input must be between " << min << " and " << max << std::endl;
+			std::getline(std::cin, responseString);
+		}
+	}
 
 	return std::stoi(responseString);
 
