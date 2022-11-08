@@ -167,35 +167,26 @@ void writeFileToPacket(int sequenceNumber) {
 
     //create ifstream object
     std::ifstream fileInputStream;
-    //open file at filepath in read and binary modes
-    fileInputStream.open(filePath, std::ios_base::in | std::ios_base::binary);
-    //navigate to section of file beginning at (sequenceNumber * packetSize) offset from beginning
-    fileInputStream.seekg(sequenceNumber * packetSize, std::ios_base::beg);
+    //open file at file_path in read and binary modes
+    fileInputStream.open(file_path, std::ios_base::in | std::ios_base::binary);
+    //navigate to section of file beginning at (sequenceNumber * packet_size) offset from beginning
+    fileInputStream.seekg(sequenceNumber * packet_size, std::ios_base::beg);
 
     //create char array for file contents
-    char contents[packetSize];
-    for(int i = 0; i < packetSize; i++) {
-        contents[i] = '\0';
-    }
+    char contents[packet_size];
 
-    //read file contents into array of amount packetSize
-    if(sequenceNumber + 1 < fileSizeRangeOfSequenceNumbers) {
-        fileInputStream.read(contents, packetSize);
-    } else {
-        int remainingBytes = fileSize - (sequenceNumber * packetSize);
-        std::cout << "REMAINING BYTES: " << remainingBytes << std::endl;
-        fileInputStream.read(contents, remainingBytes);
-    }
+    //read file contents into array of amount packet_size
+    fileInputStream.read(contents, packet_size);
 
     //set global packet struct sequence number
     myPacket.sequenceNumber = sequenceNumber;
     if(myPacket.sequenceNumber != FINAL_SEQUENCE_NUMBER) {
         //copy the contents of the array to the global packet struct char vector
-        for (int i = 0; i < packetSize; i++) {
+        for (int i = 0; i < packet_size; i++) {
             myPacket.contents[i] = contents[i];
         }
     } else {
-        for (int i = 0; i < packetSize; i++) {
+        for (int i = 0; i < packet_size; i++) {
             myPacket.contents[i] = '\0';
         }
     }
