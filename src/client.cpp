@@ -45,7 +45,7 @@ int main() {
 	//take user input
 	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
 
-	packet_size = userIntegerPrompt("Input desired packet size (bytes):", true, 1, 5000);
+	packet_size = userIntegerPrompt("Input desired packet size (bytes):", true, 1, 500000);
 	port_num = userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
 	//timeout_interval = userIntegerPrompt("Input timeout interval:");
 	//window_size = userIntegerPrompt("Input window size:");
