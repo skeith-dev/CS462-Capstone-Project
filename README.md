@@ -16,14 +16,18 @@ $ make
 Then create another Putty window (one for sender, one for receiver)
 
 In the first window enter:
+
 $ ./reciever.out
 
 In the second window enter:
-./sender.out
+
+$ ./sender.out
+
 
 For reciever enter the prompted information:
 Port number
 path for file to write to as a .txt
+
 
 After receiver information has been entered (press enter after typing file output path)
 
