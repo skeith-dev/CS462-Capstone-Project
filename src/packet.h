@@ -4,7 +4,7 @@
 
 struct Packet {
     int sequenceNumber;
-    char contents[500000];//MAX_INPUT
+    char contents[23333];//MAX_INPUT
     bool valid;
 };
 
