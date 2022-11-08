@@ -9,9 +9,23 @@ This repository is the capstone project of the Computer Science Comprehensive Ma
 ## Instructions
 To run the code, perform the following steps:
 
-make
-./reciever.out
+Open a Putty window and enter the following line:
+
+$ make
+
+Then create another Putty window (one for sender, one for receiver)
+
+In the first window enter:
+$ ./reciever.out
+
+In the second window enter:
 ./sender.out
+
+For reciever enter the prompted information:
+Port number
+path for file to write to as a .txt
+
+After receiver information is entered
 
 For sender enter the prompted information:
 Packet size
@@ -19,6 +33,3 @@ Port number
 Sequence range
 .txt file that you want to transfer
 
-For reciever enter the prompted information:
-Port number
-path for file to write to as a .txt
