@@ -1,334 +1,255 @@
 //
-// Created by Spencer Keith on 4/18/22.
+// Created through the efforts of Connor Kamrowski, Spencer Keith, and Jennifer Curry
+//
+//CHECK TODO tag
+// TODO LIST - things that need to be implemented or changed
+// timeout_interval, window_size, 'error' simulator (packet loss), accepted/sent array memory too high
+//
+//CHECK OPTIMIZE tag
+// OPTIMIZE LIST - things that are inefficient, but work. To make the program better we can look at these
+//
 //
 
 #include <iostream>
 #include <vector>
 #include <string>
+#include <algorithm>
 #include <iterator>
 #include <fstream>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
 #include "packet.h"
+#include <chrono>
 
 #define FINAL_SEQUENCE_NUMBER -1
 
 
-//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
-//Fields      //*****//*****//*****//*****//*****//*****//*****//*****//
+using namespace std;
 
-Packet myPacket;
-
-std::string ipAddress; //IP address of the target server
-int portNum; //port number of the target server
-int protocolType; //0 for S&W, 1 for GBN, 2 for SR
-int packetSize; //specified size of packets to be sent
-int timeoutInterval; //user-specified (0+) or default (-1)
-int slidingWindowSize; //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
-int situationalErrors; //none (0), randomly generated (1), or user-specified (2)
-std::string filePath; //path to file to be sent
-int rangeOfSequenceNumbers; //ex. (sliding window size = 3) [1, 2, 3] -> [2, 3, 4] -> [3, 4, 5], range = 5
-bool quit; //true for yes, false for no
-
-int fileSize; //size of file in bytes
-int fileSizeRangeOfSequenceNumbers; //the range of sequence numbers necessary to send the whole file
-
-int iterator; //iterator for network protocols
-int situationalErrorsIterator; //iterator used to drop packets of a particular iteration
-std::vector<int> situationalErrorsIterations; //indices of packets to be dropped (ex. every 5th packet)
-
-//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
-//Function declarations            //*****//*****//*****//*****//*****//
-
-std::string ipAddressPrompt();
-
-int portNumPrompt();
-
-int protocolTypePrompt();
-
-int packetSizePrompt();
-
-int timeoutIntervalPrompt();
-
-int slidingWindowSizePrompt();
-
-int rangeOfSequenceNumbersPrompt();
-
-int situationalErrorsPrompt();
-
-std::string filePathPrompt();
-
-bool quitPrompt();
-
-void printWindow();
-
-void openFile();
-
+//Function definitions
 void writeFileToPacket(int sequenceNumber);
 
-void sendPacket(int clientSocket, sockaddr_in serverAddress, int sequenceNumber);
+int sendPacket(int clientSocket, int sequenceNumber);
 
-void generateRandomSituationalErrors();
+std::string userStringPrompt(std::string request);
 
-void generateUserSituationalErrors();
+int userIntegerPrompt(std::string request, bool restricted, int min, int max);
 
-bool checkIfDropPacket();
+void executeSRProtocol(int clientSocket, sockaddr_in server_address);
 
-void executeSAWProtocol(int clientSocket, sockaddr_in serverAddress);
+int openFile();
 
-void executeGBNProtocol(int clientSocket, sockaddr_in serverAddress);
 
-//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
-//Function implementations (including main)      //*****//*****//*****//
+//Variable definitions
+int packet_size, timeout_interval, window_size, sequence_range, port_num, num_packets;
+std::string file_path; //path to file to be sent
+Packet myPacket;
 
+//Call to Main
 int main() {
 
-    //set up UDP socket
-    struct sockaddr_in serverAddress = {0};
-    int clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
+	//take user input
+	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
+
+	packet_size = userIntegerPrompt("Input desired packet size (bytes):", true, 1, 23333);
+	port_num = userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
+	timeout_interval = userIntegerPrompt("Input timeout interval:", true, 10, 40000);
+	sequence_range = userIntegerPrompt("Input sequence range:", true, 1, 9999999);
+	window_size = userIntegerPrompt("Input window size:", true, 1, sequence_range);
+	//TODO
+	//situationalErrorsPrompt();
+	file_path = userStringPrompt("Input path of file to transfer:");
+	std::cout<<std::endl;
+
+	//connect socket for sending packets, listening for acks
+	//	use ports 9000-9999
+    struct sockaddr_in server_address = {0};
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);//SOCK_STREAM for TCP
     if(clientSocket == -1) {
         perror("Failed to create client socket");
         exit(EXIT_FAILURE);
     }
 
-    do {
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(port_num);
+	
+	//for now, just run the protocol on a single file
+	executeSRProtocol(clientSocket, server_address);
 
-        serverAddress.sin_family = AF_INET;
+}
 
-        //prompt user for each of the following fields
-        ipAddress = ipAddressPrompt();
-        serverAddress.sin_addr.s_addr = inet_addr(ipAddress.c_str());
 
-        portNum = portNumPrompt();
-        serverAddress.sin_port = htons(portNum);
+//Function implementation
 
-        protocolType = protocolTypePrompt();
-        packetSize = packetSizePrompt();
-        timeoutInterval = timeoutIntervalPrompt();
+/*
+ * ExecuteSRProtocol implements the actual selective repeat protocol
+ */
+void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
 
-        if(protocolType != 0) {
-            slidingWindowSize = slidingWindowSizePrompt();
+	//iterator to count the number of packets sent
+    int iterator = 0;
+    int window_position = 0;
+	int client_fd;
+
+	//create time_points for start and end
+    std::chrono::system_clock::time_point startTime;
+    std::chrono::system_clock::time_point endTime;
+	//log the starting time
+    startTime = std::chrono::system_clock::now();
+	
+	//connect to the server
+    if ((client_fd = connect(clientSocket, (struct sockaddr*)&server_address, sizeof(server_address))) < 0) {
+        printf("\nConnection Failed \n");
+        exit(0);
+    }
+	
+	num_packets = openFile();
+	//std::cout << std::endl << "Num packets:" << num_packets << std::endl;
+	//TODO - memory efficiency, make this match the window somehow
+	//This has been worked out of the code ---- //bool received[num_packets] = { 0 };
+	
+	int SR_window[window_size];
+	bool sent[window_size] = { 0 }; //OPTIMIZE - this and next array could be simplified
+	std::chrono::_V2::system_clock::time_point sent_times[window_size];
+	
+	//populate SR_window with sequence numbers
+	for (int i = 0; i < window_size; i++)
+		SR_window[i] = i;
+
+	double sent_data;
+
+	//Don't take poseidon down, just keep this failsafe implemented in case something fails but it keeps running
+	int FAILSAFE = 0;
+    while(FAILSAFE < 1000000000) {
+		FAILSAFE++;
+
+        if(iterator >= sequence_range || iterator+1 >= num_packets) {
+			//temp is to accept the integer without doing anything with the value.
+            int temp = sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
+			//cout << "Final sequence number reached." << std::endl;
+            break;
         }
 
-        situationalErrors = situationalErrorsPrompt();
-        switch (situationalErrors) {
-            case 1:
-                generateRandomSituationalErrors();
-                break;
-            case 2:
-                generateUserSituationalErrors();
-                break;
-            default:
-                break;
+		//send the packet
+		if (sent[window_position] == 0){			
+			//the packet hasn't been sent yet, send it
+			sent_data += sendPacket(clientSocket, window_position);
+			sent[window_position] = 1;
+			sent_times[window_position] = std::chrono::system_clock::now();
+
+		//TODO - make the comment below part of the code again, it should be working?
+		}/* else if ((std::chrono::system_clock::now() - sent_times[window_position]).count() > timeout_interval) {
+			//the packet timed out, send again
+			std::cout << "** Packet " << SR_window[window_position] << " timed out. Sending again **" << std::endl;
+			sent_data += sendPacket(clientSocket, window_position);
+			sent_times[window_position] = std::chrono::system_clock::now();
+
+		} */else {
+			//the packet is currently being sent, or it was already accepted. Either way, check the next.
+			window_position = (window_position+1) % window_size;
+		}
+
+        Packet myAck{};
+
+		//check for acks
+        if(recv(clientSocket, &myAck, sizeof(myAck), MSG_DONTWAIT) > 0) {
+            std::cout << "Received ack #" << myAck.sequenceNumber << std::endl;
+            iterator++;
+			//OPTIMIZE
+			for(int index = 0; index < window_size; index++) {
+				if(myAck.sequenceNumber == SR_window[index]) {
+					SR_window[index] = -2;
+					break;
+				}
+			}
+
+			//check for window (does it need to move?)
+			//below logic => if received at the window's start is -1, then move window up until it isn't
+			if (SR_window[0] == -2) {
+				while (SR_window[0] == -2) {
+				//OPTIMIZE - while and for loop could be separated
+					for(int i=0; i<window_size; i++){
+						//if(SR_window[i]+1 < num_packets) {
+						if(i<window_size-1) {
+							SR_window[i] = SR_window[i+1];
+							sent[i] = sent[i+1];
+						} else {
+							SR_window[i] = SR_window[i]+1;
+							sent[window_size-1] = 0;
+						}
+					}
+				}
+				// Print the (new) current window
+				std::cout << "Current window: [";
+				for (int i = 0; i < window_size-1; i++) 
+					std::cout << SR_window[i] << ", ";
+				std::cout << SR_window[window_size-1] << "]" << std::endl;
+			}
+
         }
-
-        filePath = filePathPrompt();
-        openFile();
-
-        rangeOfSequenceNumbers = rangeOfSequenceNumbersPrompt();
-
-        switch (protocolType) {
-            case 0:
-                std::cout << std::endl << "Executing Stop & Wait protocol..." << std::endl << std::endl;
-                executeSAWProtocol(clientSocket, serverAddress);
-                break;
-            case 1:
-                std::cout << std::endl << "Executing Go Back N protocol..." << std::endl << std::endl;
-                executeGBNProtocol(clientSocket, serverAddress);
-                break;
-            case 2:
-                std::cout << std::endl << "Executing Selective Repeat protocol..." << std::endl << std::endl;
-                //executeSRProtocol();
-                break;
-            default:
-                break;
-        }
-
-        quit = quitPrompt();
-
-    } while(!quit);
-
-    return 0;
-
-}
-
-//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
-//Prompts
-
-std::string ipAddressPrompt() {
-
-    std::cout << "What is the IP address of the target server:" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return responseString;
-
-}
-
-int portNumPrompt() {
-
-    std::cout << "What is the port number of the target server:" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int protocolTypePrompt() {
-
-    std::cout << "Type of protocol, S&W (0), GBN (1), or SR (2):" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int packetSizePrompt() {
-
-    std::cout << "Size of packets:" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int timeoutIntervalPrompt() {
-
-    std::cout << "Timeout interval, user-specified or ping calculated (-1):" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    int responseInt = std::stoi(responseString);
-    if(responseInt >= 0) {
-        return responseInt;
-    } else {
-        return 2;
+		
+		
+		//end of while loop
     }
 
-}
+	if(FAILSAFE >= 1000000000){
+		std::cout << std::endl << "Program timed out (failsafe for Poseidon stopped the code)." << std::endl;
+		exit(0);
+	}
+	
+	std::cout << ":" << std::endl << ":" << std::endl << "Session successfully terminated" << std::endl;
 
-int slidingWindowSizePrompt() {
+    endTime = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsedSeconds = endTime - startTime;
+    std::cout << std::endl << "Number of packets sent: " << iterator << std::endl;
+    std::cout << "Total execution time: " << elapsedSeconds.count() << std::endl;
+    std::cout << "Total throughput (bps): " << sent_data/elapsedSeconds.count() << std::endl;
 
-    std::cout << "Size of sliding window:" << std::endl;
 
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int rangeOfSequenceNumbersPrompt() {
-
-    std::cout << "Range of sequence numbers (" << fileSizeRangeOfSequenceNumbers << " required to send entire file):" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int situationalErrorsPrompt() {
-
-    std::cout << "Situational errors; none (0), randomly generated (1), or user-specified (2):" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
+/*
+	bool waiting = true;
+	while(true){
+		int result = recv(client_fd, &waiting, sizeof(waiting), MSG_DONTWAIT);
+		if (result > 0 && waiting == false) {
+			std::cout << "done" << std::endl;
+			break;
+		}
+	}
+*/
+    close(client_fd);
 
 }
 
-std::string filePathPrompt() {
-
-    std::cout << "What is the filepath of the file you wish to send:" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return responseString;
-
-}
-
-bool quitPrompt() {
-
-    std::cout << std::endl << "Would you like to exit (1), or perform another file transfer (0):" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString) == 1;
-
-}
-
-//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
-//UDP NETWORKING FUNCTIONS, FILE READING/WRITING FUNCTIONS
-
-void printWindow() {
-
-    std::cout << "Current window = [ ";
-    for(int i = iterator; i < iterator + slidingWindowSize; i++) {
-        if(i < rangeOfSequenceNumbers) {
-            std::cout << i << " ";
-        }
-    }
-    std::cout << "]" << std::endl;
-
-}
-
-void openFile() {
-
-    std::ifstream fileInputStream;
-
-    fileInputStream.open(filePath, std::ios_base::in | std::ios_base::binary);
-    if (fileInputStream.fail()) {
-        throw std::fstream::failure("Failed while opening file " + filePath);
-    }
-
-    fileInputStream.seekg(0, fileInputStream.end);
-    fileSize = (int) fileInputStream.tellg();
-    fileSizeRangeOfSequenceNumbers = fileSize / packetSize + fileSize % packetSize;
-
-    std::cout << std::endl << "File to deliver: " << filePath << std::endl << "File size: " << fileSize << " bytes" << std::endl << std::endl;
-
-    fileInputStream.close();
-
-}
-
+/*
+ * writeFileToPacket gets the packet at a specified sequence number of the file
+ *
+ */
 void writeFileToPacket(int sequenceNumber) {
 
     //create ifstream object
     std::ifstream fileInputStream;
-    //open file at filepath in read and binary modes
-    fileInputStream.open(filePath, std::ios_base::in | std::ios_base::binary);
-    //navigate to section of file beginning at (sequenceNumber * packetSize) offset from beginning
-    fileInputStream.seekg(sequenceNumber * packetSize, std::ios_base::beg);
+    //open file at file_path in read and binary modes
+    fileInputStream.open(file_path, std::ios_base::in | std::ios_base::binary);
+    //navigate to section of file beginning at (sequenceNumber * packet_size) offset from beginning
+    fileInputStream.seekg(sequenceNumber * packet_size, std::ios_base::beg);
 
     //create char array for file contents
-    char contents[packetSize];
-    //read file contents into array of amount packetSize
-    fileInputStream.read(contents, packetSize);
+    char contents[packet_size];
+
+    //read file contents into array of amount packet_size
+    fileInputStream.read(contents, packet_size);
 
     //set global packet struct sequence number
     myPacket.sequenceNumber = sequenceNumber;
     if(myPacket.sequenceNumber != FINAL_SEQUENCE_NUMBER) {
         //copy the contents of the array to the global packet struct char vector
-        for (int i = 0; i < packetSize; i++) {
-            myPacket.contents[i] = contents[i];
+        for (int i = 0; i < packet_size; i++) {
+			myPacket.contents[i] = contents[i];
         }
     } else {
-        for (int i = 0; i < packetSize; i++) {
-            myPacket.contents[i] = '\0';
+        for (int i = 0; i < packet_size; i++) {
+            myPacket.contents[0] = '\0';
         }
     }
 
@@ -336,211 +257,92 @@ void writeFileToPacket(int sequenceNumber) {
 
 }
 
-void sendPacket(int clientSocket, sockaddr_in serverAddress, int sequenceNumber) {
+/*
+ * sendPacket sends the packet to the server
+ *
+ */
+int sendPacket(int clientSocket, int sequenceNumber) {
 
     writeFileToPacket(sequenceNumber);
 
     myPacket.valid = true;
 
-    if(!checkIfDropPacket()) {
-        sendto(clientSocket, &myPacket, sizeof(myPacket), 0, (const struct sockaddr *) &serverAddress,
-               sizeof(serverAddress));
+	int result = send(clientSocket, &myPacket, sizeof(myPacket), 0);
+	
+	//cout << "result of send:" << result << std::endl;
 
-        std::cout << "Sent Packet #" << myPacket.sequenceNumber << ": [ ";
-        for(int i = 0; i < packetSize; i++) {
-            std::cout << myPacket.contents[i];
-        }
-        std::cout << " ]" << std::endl;
-    } else{
-        std::cout << "Dropped Packet #" << myPacket.sequenceNumber << std::endl;
-    }
+	if (myPacket.sequenceNumber != -1) {
+		std::cout << "Sent Packet #" << myPacket.sequenceNumber << std::endl;
+	}
+	return result;
+/*	std::cout << "Sent Packet #" << myPacket.sequenceNumber << ": [ ";
+	for(int i = 0; i < packet_size; i++) {
+		std::cout << myPacket.contents[i];
+	}
+	std::cout << " ]" << std::endl;
+*/
+}
+
+
+/*
+ * filePathPrompt takes the path to the file (to be sent) and saves it as a string
+ */
+std::string userStringPrompt(std::string request) {
+
+	std::cout << request << std::endl;
+
+	std::string responseString;
+	std::getline(std::cin, responseString);
+
+	return responseString;
 
 }
 
-//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
-//Situational errors
+/*
+ * userIntegerPrompt handles any user input where the returned value is an integer
+ */
+int userIntegerPrompt(std::string request, bool restricted, int min, int max) {
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "cert-msc50-cpp"
-#pragma ide diagnostic ignored "cert-msc51-cpp"
-void generateRandomSituationalErrors() {
+	std::string responseString;
+	std::cout << request << std::endl;
+	std::getline(std::cin, responseString);		
+	if (restricted) {
+		while (std::stoi(responseString) < min || std::stoi(responseString) > max) {
+			std::cout << std::endl << "Input must be between " << min << " and " << max << ". ";
+			std::cout << request << std::endl;
+			std::getline(std::cin, responseString);
+		}
+	}
 
-    srand(time(nullptr));
-
-    //generate a random number between 1 and 3
-    int numberOfErrors = (rand() % 3) + 1;
-
-    //insert a random number between 2 and 10 into the vector
-    for(int i = 0; i < numberOfErrors; i++) {
-        situationalErrorsIterations.insert(situationalErrorsIterations.end(), (rand() % 10) + 2);
-    }
-
-    //remove duplicate elements from the vector
-    sort(situationalErrorsIterations.begin(), situationalErrorsIterations.end());
-    situationalErrorsIterations.erase( unique(situationalErrorsIterations.begin(), situationalErrorsIterations.end() ), situationalErrorsIterations.end() );
-
-    std::cout << "Every iteration of each of the following packets will be dropped: ";
-    for(int situationalErrorIndex : situationalErrorsIterations) {
-        std::cout << situationalErrorIndex << " ";
-    }
-    std::cout << std::endl << std::endl;
-
-}
-#pragma clang diagnostic pop
-
-void generateUserSituationalErrors() {
-
-    std::string droppedPacketString;
-    int droppedPacketCount;
-
-    std::cout << "How many packet iterations do you want to drop:" << std::endl;
-    std::getline(std::cin, droppedPacketString);
-
-    droppedPacketCount = std::stoi(droppedPacketString);
-
-    for(int i = 0; i < droppedPacketCount; i++) {
-        std::string packetIterationString;
-        std::cout << "#" << i + 1 << " packet iteration to be dropped:" << std::endl;
-        std::getline(std::cin, packetIterationString);
-
-        situationalErrorsIterations.insert(situationalErrorsIterations.end(), std::stoi(packetIterationString));
-    }
-
-    std::cout << "Every iteration of each of the following packets will be dropped: ";
-    for(int situationalErrorIndex : situationalErrorsIterations) {
-        std::cout << situationalErrorIndex << " ";
-    }
-    std::cout << std::endl << std::endl;
+	return std::stoi(responseString);
 
 }
 
-bool checkIfDropPacket() {
+/*
+ * openFile calculates the number of packets that will be sent
+ */
+int openFile() {
 
-    for(int situationalErrorsIteration : situationalErrorsIterations) {
-        if(situationalErrorsIterator > 1 && situationalErrorsIterator % situationalErrorsIteration == 0) {
-            std::cout << situationalErrorsIterator << " % " << situationalErrorsIteration << " = " << 0 << std::endl;
-            return true;
-        }
-    }
-    return false;
+    std::ifstream fileInputStream;
 
-}
-
-//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
-//Network protocols (algorithms)
-
-void executeSAWProtocol(int clientSocket, sockaddr_in serverAddress) {
-
-    std::chrono::system_clock::time_point startTime;
-    std::chrono::system_clock::time_point endTime;
-
-    std::chrono::system_clock::time_point timerStart;
-
-    int serverSize = sizeof(serverAddress);
-
-    startTime = std::chrono::system_clock::now();
-
-    bool outstanding = false;
-    iterator = 0;
-    situationalErrorsIterator = 0;
-    while(true) {
-
-        if(iterator >= rangeOfSequenceNumbers) {
-            sendPacket(clientSocket, serverAddress, FINAL_SEQUENCE_NUMBER);
-            situationalErrorsIterator++;
-            break;
-        }
-
-        Packet myAck{};
-
-        if(!outstanding) {
-            sendPacket(clientSocket, serverAddress, iterator);
-            situationalErrorsIterator++;
-            timerStart = std::chrono::system_clock::now();
-            outstanding = true;
-        }
-
-        if(recvfrom(clientSocket, &myAck, sizeof(myAck), MSG_DONTWAIT, (struct sockaddr*)&serverAddress, reinterpret_cast<socklen_t *>(&serverSize)) != -1) {
-            std::cout << "Received ack #" << myAck.sequenceNumber << std::endl;
-            iterator = myAck.sequenceNumber + 1;
-            timerStart = std::chrono::system_clock::now();
-            outstanding = false;
-        }
-
-        std::chrono::duration<double> timer = std::chrono::system_clock::now() - timerStart;
-        if(timer.count() >= timeoutInterval) {
-            std::cout << "Timed out! " << timer.count() << " > " << timeoutInterval << " (timeout interval)" << std::endl;
-            timerStart = std::chrono::system_clock::now();
-            sendPacket(clientSocket, serverAddress, iterator);
-            situationalErrorsIterator++;
-        }
-
+    fileInputStream.open(file_path, std::ios_base::in | std::ios_base::binary);
+    if (fileInputStream.fail()) {
+        throw std::fstream::failure("Failed while opening file " + file_path);
     }
 
-    endTime = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsedSeconds = endTime - startTime;
-    std::cout << std::endl << "Total execution time = " << elapsedSeconds.count() << std::endl;
+    fileInputStream.seekg(0, fileInputStream.end);
+    int fileSize = (int) fileInputStream.tellg();
+    int fileSizeRangeOfSequenceNumbers = fileSize / packet_size + 1;
+	
+	if (fileSizeRangeOfSequenceNumbers < 1) {
+		fileSizeRangeOfSequenceNumbers = 1;
+	} else if ((fileSize % packet_size) > 0) fileSizeRangeOfSequenceNumbers++;
 
-}
+    std::cout << std::endl << "File to deliver: " << file_path << std::endl << "File size: " << fileSize << " bytes" << std::endl << std::endl;
+	//"good practice would be enter packet size in mb, bytes, etc"
 
-void executeGBNProtocol(int clientSocket, sockaddr_in serverAddress) {
-
-    std::chrono::system_clock::time_point startTime;
-    std::chrono::system_clock::time_point endTime;
-
-    std::chrono::system_clock::time_point timerStart;
-
-    int serverSize = sizeof(serverAddress);
-
-    startTime = std::chrono::system_clock::now();
-
-    iterator = 0;
-    situationalErrorsIterator = 0;
-    int next = 0;
-    while(true) {
-
-        if(iterator >= rangeOfSequenceNumbers) {
-            sendPacket(clientSocket, serverAddress, FINAL_SEQUENCE_NUMBER);
-            situationalErrorsIterator++;
-            break;
-        }
-
-        Packet myAck{};
-
-        if(next < iterator + slidingWindowSize && next < rangeOfSequenceNumbers) {
-            sendPacket(clientSocket, serverAddress, next);
-            situationalErrorsIterator++;
-            timerStart = std::chrono::system_clock::now();
-            next++;
-        }
-
-        if(recvfrom(clientSocket, &myAck, sizeof(myAck), MSG_DONTWAIT, (struct sockaddr*)&serverAddress, reinterpret_cast<socklen_t *>(&serverSize)) != -1) {
-
-            std::cout << "Received ack #" << myAck.sequenceNumber << std::endl;
-
-            iterator = myAck.sequenceNumber + 1;
-            printWindow();
-
-        }
-
-        std::chrono::duration<double> timer = std::chrono::system_clock::now() - timerStart;
-        if(std::abs(timer.count()) >= timeoutInterval) {
-
-            std::cout << "Timed out! " << timer.count() << " >= " << timeoutInterval << " (timeout interval)" << std::endl;
-
-            for(int i = iterator; i < next; i++) {
-                sendPacket(clientSocket, serverAddress, i);
-                situationalErrorsIterator++;
-            }
-
-            timerStart = std::chrono::system_clock::now();
-
-        }
-
-    }
-
-    endTime = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsedSeconds = endTime - startTime;
-    std::cout << std::endl << "Total execution time = " << elapsedSeconds.count() << std::endl;
+    fileInputStream.close();
+	
+	return fileSizeRangeOfSequenceNumbers;
 
 }
