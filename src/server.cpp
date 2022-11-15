@@ -1,99 +1,126 @@
+//
+// Created by Spencer Keith on 4/18/22.
+//
+
 #include <iostream>
 #include <string>
 #include <fstream>
 #include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <sys/socket.h>
-
 #include "packet.h"
+#include <cstring>
 
 #define FINAL_SEQUENCE_NUMBER -1
 
 
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//Fields      //*****//*****//*****//*****//*****//*****//*****//*****//
+
+std::string ipAddress; //IP address of the target server
 int portNum; //port number of the target server
+int protocolType; //true for GBN, false for SR
 int packetSize; //specified size of packets to be sent
+int timeoutInterval; //user-specified (0+) or ping calculated (-1)
 int slidingWindowSize;  //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
 std::string filePath;
+bool quit; //true for yes, false for no
+
+int iterator; //iterator for network protocols
+
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//Function declarations            //*****//*****//*****//*****//*****//
+
+std::string ipAddressPrompt();
+
+int portNumPrompt();
+
+int protocolTypePrompt();
+
+int packetSizePrompt();
+
+int slidingWindowSizePrompt();
 
 std::string filePathPrompt();
-int portNumPrompt();
-int packetSizePrompt();
-void writePacketToFile(bool append, const std::string& message);
-void executeSRProtocol(int serverSocket, int clientSize);
-void sendAck(int serverSocket, int sequenceNumber);
-std::string userStringPrompt(std::string request);
-int userIntegerPrompt(std::string request);
 
+bool quitPrompt();
 
+void executeSAW_GBNProtocol(int serverSocket, sockaddr_in clientAddress);
 
-using namespace std;
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//Functions (including main)       //*****//*****//*****//*****//*****//
 
 int main() {
-	
-	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
 
-	portNum = userIntegerPrompt("Input port number (9000-9999):");
-	filePath = userStringPrompt("Enter path for file to write to:");
-	std::cout<<std::endl;
-	
-	//create a socket
-	int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (serverSocket == -1){
-		cerr << "No socket created";
-		return -1;
-	}
-	
-    int opt = 1;
-    // Forcefully attaching socket to the port
-    if (setsockopt(serverSocket, SOL_SOCKET,
-                   SO_REUSEADDR | SO_REUSEPORT, &opt,
-                   sizeof(opt))) {
-        perror("setsockopt");
+    //set up UDP socket
+    struct sockaddr_in serverAddress{}, clientAddress{};
+    memset(&serverAddress, 0, sizeof(serverAddress));
+    memset(&clientAddress, 0, sizeof(clientAddress));
+    int serverSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if(serverSocket == -1) {
+        perror("Failed to create server socket:");
         exit(EXIT_FAILURE);
     }
-	
-    struct sockaddr_in serverAddress = {0};
-	
-	//bind the socket to an ip address and port
-	serverAddress.sin_family = AF_INET;
-    serverAddress.sin_addr.s_addr = INADDR_ANY; //TEST
-	serverAddress.sin_port = htons(portNum);
 
-	if (bind(serverSocket, (sockaddr*)&serverAddress, sizeof(serverAddress)) == -1){
-		cerr << "can't bind to port";
-		return -2;
-	}
-	//tell the socket to listen
-	if (listen(serverSocket, SOMAXCONN) == -1){
-		cerr << "Can't listen";
-		return -3;
-	}
-	
-	//wait for connection
-	sockaddr_in client;
-	socklen_t clientSize = sizeof(client);
-	int clientSocket = accept(serverSocket, (sockaddr*)&client, &clientSize);
-	if(clientSocket == -1){
-		cerr << "Problem with client connecting";
-		return -4;
-	}
-	
-	//close listening socket
-	close(serverSocket);
-	
-	//start recieving
-	executeSRProtocol(clientSocket, clientSize);
-	
-	
-	//close socket
-	close(clientSocket);
-	
+    do {
+
+        serverAddress.sin_family = AF_INET;
+
+        //prompt user for each of the following fields
+        ipAddress = ipAddressPrompt();
+        serverAddress.sin_addr.s_addr = inet_addr(ipAddress.c_str());
+
+        portNum = portNumPrompt();
+        serverAddress.sin_port = htons(portNum);
+
+        protocolType = protocolTypePrompt();
+        packetSize = packetSizePrompt();
+
+        if(protocolType == 2) {
+            slidingWindowSize = slidingWindowSizePrompt();
+        }
+
+        filePath = filePathPrompt();
+
+        int socketBinding = bind(serverSocket, (const struct sockaddr *)&serverAddress, sizeof(serverAddress));
+        if(socketBinding == -1) {
+            perror("Failed to bind server socket");
+            close(serverSocket);
+            exit(EXIT_FAILURE);
+        }
+
+        switch (protocolType) {
+            case 0:
+                std::cout << std::endl << "Executing Stop & Wait protocol..." << std::endl << std::endl;
+                executeSAW_GBNProtocol(serverSocket, clientAddress);
+                break;
+            case 1:
+                std::cout << std::endl << "Executing Go Back N protocol..." << std::endl << std::endl;
+                executeSAW_GBNProtocol(serverSocket, clientAddress);
+                break;
+            case 2:
+                std::cout << std::endl << "Executing Selective Repeat protocol..." << std::endl << std::endl;
+                //executeSRProtocol();
+                break;
+            default:
+                break;
+        }
+
+        close(serverSocket);
+
+        quit = quitPrompt();
+
+    } while(!quit);
+
+    return 0;
 }
 
-std::string filePathPrompt() {
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//Prompts
 
-    std::cout << "What is the filepath of the file you wish to write to:" << std::endl;
+std::string ipAddressPrompt() {
+
+    std::cout << "What is the IP address of the target server:" << std::endl;
 
     std::string responseString;
     std::getline(std::cin, responseString);
@@ -113,6 +140,96 @@ int portNumPrompt() {
 
 }
 
+int protocolTypePrompt() {
+
+    std::cout << "Type of protocol, S&W (0), GBN (1) or SR (2):" << std::endl;
+
+    std::string responseString;
+    std::getline(std::cin, responseString);
+
+    return std::stoi(responseString);
+
+}
+
+int packetSizePrompt() {
+
+    std::cout << "Size of packets:" << std::endl;
+
+    std::string responseString;
+    std::getline(std::cin, responseString);
+
+    return std::stoi(responseString);
+
+}
+
+int slidingWindowSizePrompt() {
+
+    std::cout << "Size of sliding window:" << std::endl;
+
+    std::string responseString;
+    std::getline(std::cin, responseString);
+
+    return std::stoi(responseString);
+
+}
+
+int rangeOfSequenceNumbersPrompt() {
+
+    std::cout << "Range of sequence numbers:" << std::endl;
+
+    std::string responseString;
+    std::getline(std::cin, responseString);
+
+    return std::stoi(responseString);
+
+}
+
+std::string filePathPrompt() {
+
+    std::cout << "What is the filepath of the file you wish to write to:" << std::endl;
+
+    std::string responseString;
+    std::getline(std::cin, responseString);
+
+    return responseString;
+
+}
+
+bool quitPrompt() {
+
+    std::cout << std::endl << "Would you like to exit (1), or perform another file transfer (0):" << std::endl;
+
+    std::string responseString;
+    std::getline(std::cin, responseString);
+
+    return std::stoi(responseString) == 1;
+
+}
+
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//UDP NETWORKING FUNCTIONS, FILE READING/WRITING FUNCTIONS
+
+void printWindow() {
+
+    std::cout << "Current window = [ ";
+    for (int i = iterator; i < iterator + slidingWindowSize; i++) {
+        std::cout << i << " ";
+    }
+    std::cout << "]" << std::endl;
+
+}
+
+void sendAck(int serverSocket, sockaddr_in clientAddress, int sequenceNumber) {
+
+    Packet myAck{};
+    myAck.sequenceNumber = sequenceNumber;
+    myAck.valid = true;
+
+    sendto(serverSocket, &myAck, sizeof(myAck), 0, (const struct sockaddr *) &clientAddress, sizeof(clientAddress));
+    std::cout << "Sent Ack #" << myAck.sequenceNumber << std::endl;
+
+}
+
 void writePacketToFile(bool append, const std::string& message) {
 
     std::ofstream fileOutputStream;
@@ -127,81 +244,40 @@ void writePacketToFile(bool append, const std::string& message) {
 
 }
 
-void executeSRProtocol(int serverSocket, int clientSize) {
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//Network protocols (algorithms)
 
-    int iterator = 0;
-	
-	int FAILSAFE = 0;
-    while(FAILSAFE < 1000000000) {
-		FAILSAFE++;
+void executeSAW_GBNProtocol(int serverSocket, sockaddr_in clientAddress) {
+
+    int clientSize = sizeof(clientAddress);
+
+    iterator = 0;
+    while(true) {
 
         Packet myPacket{};
 
-		if(recv(serverSocket, &myPacket, sizeof(myPacket), MSG_DONTWAIT) > 0) {
-			
+        if(recvfrom(serverSocket, &myPacket, sizeof(myPacket), MSG_DONTWAIT, (struct sockaddr*)&clientAddress, reinterpret_cast<socklen_t *>(&clientSize)) != -1) {
+
             if(myPacket.sequenceNumber == FINAL_SEQUENCE_NUMBER) {
                 break;
             }
 
-            std::cout << "Packet " << myPacket.sequenceNumber << " recieved" << std::endl;
-            /*for(int i = 0; i < packetSize; i++) {
+            std::cout << "Received packet #" << myPacket.sequenceNumber << "! [ ";
+            for(int i = 0; i < packetSize; i++) {
                 std::cout << myPacket.contents[i];
             }
-            std::cout << " ]" << std::endl;*/
+            std::cout << " ]" << std::endl;
 
-            if(myPacket.sequenceNumber == iterator) {
-                sendAck(serverSocket, iterator);
+            if(myPacket.valid && myPacket.sequenceNumber == iterator) {
+                sendAck(serverSocket, clientAddress, iterator);
                 writePacketToFile(true, myPacket.contents);
                 iterator++;
             } else {
                 std::cout << "Received packet is corrupted!" << std::endl;
             }
-			
+
         }
 
     }
-	
-	std::cout << "Last packet seq# received: " << iterator - 1 << std::endl;
-	//std::cout << ":" << std::endl << "Successfully received file." << std::endl;
-	close(serverSocket);
-
-}
-
-void sendAck(int serverSocket, int sequenceNumber) {
-
-    Packet myAck{};
-    myAck.sequenceNumber = sequenceNumber;
-    myAck.valid = true;
-	int result = send(serverSocket, &myAck, sizeof(myAck), 0);
-	//std::cout << "Result of send: " << result << std::endl; //REMOVE, THESE ARE FOR DEBUGGING
-    std::cout << "Ack " << myAck.sequenceNumber << " sent" << std::endl;
-
-}
-
-/*
- * filePathPrompt takes the path to the file (to be sent) and saves it as a string
- */
-std::string userStringPrompt(std::string request) {
-
-	std::cout << request << std::endl;
-
-	std::string responseString;
-	std::getline(std::cin, responseString);
-
-	return responseString;
-
-}
-
-/*
- * userIntegerPrompt handles any user input where the returned value is an integer
- */
-int userIntegerPrompt(std::string request) {
-
-	std::cout << request << std::endl;
-
-	std::string responseString;
-	std::getline(std::cin, responseString);
-
-	return std::stoi(responseString);
 
 }
