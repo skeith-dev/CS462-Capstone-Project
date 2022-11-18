@@ -1,0 +1,4 @@
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/cmake-build-debug/CMakeFiles/UWEC_CS452_Capstone_Project_testServer.dir
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/cmake-build-debug/CMakeFiles/UWEC_CS462_Capstone_Project_testClient.dir

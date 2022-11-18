@@ -1,0 +1,44 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/src/fileIO.h
+iostream
+-
+fstream
+-
+
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/src/packetIO.h
+iostream
+-
+netinet/in.h
+-
+unistd.h
+-
+arpa/inet.h
+-
+
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/src/prompts.h
+iostream
+-
+string
+-
+
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/src/tests/testServer.cpp
+iostream
+-
+unistd.h
+-
+netinet/in.h
+-
+../prompts.h
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/src/prompts.h
+../packetIO.h
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/src/packetIO.h
+../fileIO.h
+/Users/spencerkeith/Desktop/School/Spring 2022/CS 462/temp/UWEC-CS462-Capstone-Project/src/fileIO.h
+
