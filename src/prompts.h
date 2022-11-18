@@ -9,26 +9,10 @@
 #import <string>
 
 
-std::string ipAddressPrompt();
+std::string userStringPrompt(const std::string& prompt);
 
-int portNumPrompt();
+int userIntPrompt(const std::string& prompt, int min, int max);
 
-int protocolTypePrompt();
-
-int packetSizePrompt();
-
-int timeoutIntervalPrompt();
-
-int slidingWindowSizePrompt();
-
-int rangeOfSequenceNumbersPrompt(int fileSizeRangeOfSequenceNumbers);
-
-int situationalErrorsPrompt();
-
-std::string inputFilePathPrompt();
-
-std::string outputFilePathPrompt();
-
-bool quitPrompt();
+bool userBoolPrompt(const std::string& prompt);
 
 #endif //UWEC_CS462_CAPSTONE_PROJECT_PROMPTS_H

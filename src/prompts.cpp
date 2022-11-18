@@ -5,9 +5,9 @@
 #include "prompts.h"
 
 
-std::string ipAddressPrompt() {
+std::string userStringPrompt(const std::string& prompt) {
 
-    std::cout << "What is the IP address of the target server:" << std::endl;
+    std::cout << prompt << std::endl;
 
     std::string responseString;
     std::getline(std::cin, responseString);
@@ -16,117 +16,39 @@ std::string ipAddressPrompt() {
 
 }
 
-int portNumPrompt() {
+int userIntPrompt(const std::string& prompt, int min, int max) {
 
-    std::cout << "What is the port number of the target server:" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int protocolTypePrompt() {
-
-    std::cout << "Type of protocol, S&W (0), GBN (1), or SR (2):" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int packetSizePrompt() {
-
-    std::cout << "Size of packets:" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int timeoutIntervalPrompt() {
-
-    std::cout << "Timeout interval, user-specified or ping calculated (-1):" << std::endl;
+    std::cout << prompt << std::endl;
 
     std::string responseString;
     std::getline(std::cin, responseString);
 
     int responseInt = std::stoi(responseString);
-    if(responseInt >= 0) {
-        return responseInt;
-    } else {
-        return 2;
+    while (responseInt < min || responseInt > max) {
+        std::cout << "Please enter a value between " << 0 << " and " << 1 << std::endl;
+        responseString.clear();
+        std::getline(std::cin, responseString);
+        responseInt = std::stoi(responseString);
     }
 
+    return responseInt;
+
 }
 
-int slidingWindowSizePrompt() {
+bool userBoolPrompt(const std::string& prompt) {
 
-    std::cout << "Size of sliding window:" << std::endl;
+    std::cout << prompt << std::endl;
 
     std::string responseString;
     std::getline(std::cin, responseString);
 
-    return std::stoi(responseString);
-
-}
-
-int rangeOfSequenceNumbersPrompt(int fileSizeRangeOfSequenceNumbers) {
-
-    std::cout << "Range of sequence numbers (" << fileSizeRangeOfSequenceNumbers << " required to send entire file):" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-int situationalErrorsPrompt() {
-
-    std::cout << "Situational errors; none (0), randomly generated (1), or user-specified (2):" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return std::stoi(responseString);
-
-}
-
-std::string inputFilePathPrompt() {
-
-    std::cout << "What is the filepath of the file you wish to send:" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return responseString;
-
-}
-
-std::string outputFilePathPrompt() {
-
-    std::cout << "What is the filepath of the file you wish to write to:" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
-    return responseString;
-
-}
-
-bool quitPrompt() {
-
-    std::cout << std::endl << "Would you like to exit (1), or perform another file transfer (0):" << std::endl;
-
-    std::string responseString;
-    std::getline(std::cin, responseString);
-
+    int responseInt = std::stoi(responseString);
+    while(responseInt < 0 || responseInt > 1) {
+        std::cout << "Please enter a value between " << 0 << " and " << 1 << std::endl;
+        responseString.clear();
+        std::getline(std::cin, responseString);
+        responseInt = std::stoi(responseString);
+    }
     return std::stoi(responseString) == 1;
 
 }

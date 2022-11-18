@@ -1,285 +1,101 @@
 //
-// Created through the efforts of Connor Kamrowski, Spencer Keith, and Jennifer Curry
-//
-//CHECK TODO-Packet_size
+// Created by Spencer Keith on 11/18/22.
 //
 
 #include <iostream>
-#include <vector>
-#include <string>
-#include <iterator>
-#include <fstream>
-#include <netinet/in.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include "packet.h"
-#include <chrono>
+#include <sstream>
+#include "prompts.h"
+#include "fileIO.h"
 
 #define FINAL_SEQUENCE_NUMBER -1
 
 
-using namespace std;
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//Function declarations                          //*****//*****//*****//
 
-//Function definitions
-void writeFileToPacket(int sequenceNumber);
+void stopAndWaitProtocol();
 
-int sendPacket(int clientSocket, int sequenceNumber);
+void selectiveRepeatProtocol();
 
-std::string userStringPrompt(std::string request);
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//Function implementations (including main)      //*****//*****//*****//
 
-int userIntegerPrompt(std::string request, bool restricted, int min, int max);
-
-void executeSRProtocol(int clientSocket, sockaddr_in server_address);
-
-int openFile();
-
-
-//Variable definitions
-int packet_size, timeout_interval, window_size, sequence_range, port_num, num_packets;
-std::string file_path; //path to file to be sent
-Packet myPacket;
-
-//Call to Main
 int main() {
 
-	//take user input
-	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
-
-	packet_size = userIntegerPrompt("Input desired packet size (bytes):", true, 1, 23333);
-	port_num = userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
-	//timeout_interval = userIntegerPrompt("Input timeout interval:");
-	//window_size = userIntegerPrompt("Input window size:");
-	sequence_range = userIntegerPrompt("Input sequence range:", true, 1, 9999999);
-	//TODO
-	//situationalErrorsPrompt();
-	file_path = userStringPrompt("Input path of file to transfer:");
-	std::cout<<std::endl;
-
-	//connect socket for sending packets, listening for acks
-	//	use ports 9000-9999
-    struct sockaddr_in server_address = {0};
-    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);//SOCK_STREAM for TCP
+    //set up TCP socket
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0); //SOCK_STREAM for TCP
+    struct sockaddr_in serverAddress = {0};
     if(clientSocket == -1) {
-        perror("Failed to create client socket");
+        perror("Failed to create client socket!");
         exit(EXIT_FAILURE);
     }
+    serverAddress.sin_family = AF_INET;
 
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(port_num);
-	
-	//for now, just run the protocol on a single file
-	executeSRProtocol(clientSocket, server_address);
+    bool quit; //true for yes, false for no
+    do {
 
-}
+        //prompt user for each of the following fields
+        //port number of the target server
+        int portNum = userIntPrompt("What is the port number of the target server:", 0, 9999);
+        serverAddress.sin_port = htons(portNum);
+        std::cout << std::endl << "Connecting to server..." << std::endl << std::endl;
+        if (connect(clientSocket, (struct sockaddr*) &serverAddress, sizeof(serverAddress)) < 0) {
+            std::cout << "Connection to server failed!" << std::endl;
+            exit(0);
+        }
+        //0 for S&W, 1 for SR
+        int protocolType = userIntPrompt("Type of protocol, S&W (0) or SR (1):", 0, 1);
+        //specified size of packets to be sent
+        int packetSize = userIntPrompt("Size of packets:", 1, INT_MAX);
+        //user-specified (0+) or default (-1)
+        int timeoutInterval = userIntPrompt("Timeout interval, user-specified or ping calculated (-1):", -1, INT_MAX);
+        //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
+        int slidingWindowSize;
+        if(protocolType > 0) {
+            slidingWindowSize = userIntPrompt("Size of sliding window:", 1, MAX_INPUT);
+        }
+        //none (0), randomly generated (1), or user-specified (2)
+        int situationalErrors = userIntPrompt("Situational errors; none (0), randomly generated (1), or user-specified (2):", 0, 2);
+        switch(situationalErrors) {
+            case 1:
+                //generateRandomSitErrors();
+                break;
+            case 2:
+                //generateUserSituationalErrors();
+                break;
+            default:
+                break;
+        }
+        //path of file to be sent
+        std::string filePath = userStringPrompt("What is the filepath of the file you wish to write FROM:");
 
+        //size of file in bytes
+        int fileSize = openFile(filePath);
+        //the range of sequence numbers necessary to send the whole file
+        int fileSizeRangeOfSeqNums = fileSize / packetSize + fileSize % packetSize;
+        //ex. (sliding window size = 3) [1, 2, 3] -> [2, 3, 4] -> [3, 4, 5], range = 5
+        std::stringstream ss;
+        ss << "Range of sequence numbers (" << fileSizeRangeOfSeqNums << " required to send entire file):";
+        int rangeOfSeqNums = userIntPrompt(ss.str(), 1, fileSizeRangeOfSeqNums);
 
-//Function implementation
-
-/*
- * ExecuteSRProtocol implements the actual selective repeat protocol
- */
-void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
-
-	//iterator to count the number of packets sent
-    int iterator = 0;
-	int client_fd;
-
-	//create time_points for start and end
-    std::chrono::system_clock::time_point startTime;
-    std::chrono::system_clock::time_point endTime;
-	//log the starting time
-    startTime = std::chrono::system_clock::now();
-	
-	//connect to the server
-    if ((client_fd = connect(clientSocket, (struct sockaddr*)&server_address, sizeof(server_address))) < 0) {
-        printf("\nConnection Failed \n");
-        exit(0);
-    }
-	
-	num_packets = openFile();
-	//std::cout << std::endl << "Num packets:" << num_packets << std::endl;
-	bool sent[num_packets] = { 0 };
-	bool received[num_packets] = { 0 };
-
-	double sent_data;
-
-	//Don't take poseidon down, just keep this failsafe implemented in case something fails but it keeps running
-	int FAILSAFE = 0;
-    while(FAILSAFE < 1000000000) {
-		FAILSAFE++;
-
-        if(iterator >= sequence_range || iterator+1 >= num_packets) {//TODO-Packet_size
-			//temp is to accept the integer without doing anything with the value.
-            int temp = sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
-			//cout << "Final sequence number reached." << std::endl;
-            break;
+        switch (protocolType) {
+            case 0:
+                std::cout << std::endl << "Executing Stop & Wait protocol..." << std::endl << std::endl;
+                //executeSAWProtocol(clientSocket, serverAddress);
+                break;
+            case 1:
+                std::cout << std::endl << "Executing Selective Repeat protocol..." << std::endl << std::endl;
+                //executeSRProtocol();
+                break;
+            default:
+                break;
         }
 
-		//send the packet
-		if (sent[iterator] == false){
-			sent_data += sendPacket(clientSocket, iterator);
-			sent[iterator] = true;
-		}
+        quit = userBoolPrompt("Would you like to exit (1), or perform another file transfer (0):");
+    } while (!quit);
 
-        Packet myAck{};
-
-        if(recv(clientSocket, &myAck, sizeof(myAck), MSG_DONTWAIT) > 0) {
-            std::cout << "Received ack #" << myAck.sequenceNumber << std::endl;
-            iterator++;
-			received[myAck.sequenceNumber] = true;
-        }
-	
-    }
-
-	if(FAILSAFE >= 1000000000){
-		std::cout << std::endl << "Program timed out (failsafe for Poseidon stopped the code)." << std::endl;
-		exit(0);
-	}
-	
-	std::cout << ":" << std::endl << ":" << std::endl << "Session successfully terminated" << std::endl;
-
-    endTime = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsedSeconds = endTime - startTime;
-    std::cout << std::endl << "Number of packets sent: " << iterator << std::endl;
-    std::cout << "Total execution time: " << elapsedSeconds.count() << std::endl;
-    std::cout << "Total throughput (bps): " << sent_data/elapsedSeconds.count() << std::endl;
-
-
-/*
-	bool waiting = true;
-	while(true){
-		int result = recv(client_fd, &waiting, sizeof(waiting), MSG_DONTWAIT);
-		if (result > 0 && waiting == false) {
-			std::cout << "done" << std::endl;
-			break;
-		}
-	}
-*/
-    close(client_fd);
-
-}
-
-/*
- * writeFileToPacket gets the packet at a specified sequence number of the file
- *
- */
-void writeFileToPacket(int sequenceNumber) {
-
-    //create ifstream object
-    std::ifstream fileInputStream;
-    //open file at file_path in read and binary modes
-    fileInputStream.open(file_path, std::ios_base::in | std::ios_base::binary);
-    //navigate to section of file beginning at (sequenceNumber * packet_size) offset from beginning
-    fileInputStream.seekg(sequenceNumber * packet_size, std::ios_base::beg);
-
-    //create char array for file contents
-    char contents[packet_size];
-
-    //read file contents into array of amount packet_size
-    fileInputStream.read(contents, packet_size);
-
-    //set global packet struct sequence number
-    myPacket.sequenceNumber = sequenceNumber;
-    if(myPacket.sequenceNumber != FINAL_SEQUENCE_NUMBER) {
-        //copy the contents of the array to the global packet struct char vector
-        for (int i = 0; i < packet_size; i++) {
-			myPacket.contents[i] = contents[i];
-        }
-    } else {
-        for (int i = 0; i < packet_size; i++) {
-            myPacket.contents[0] = '\0';
-        }
-    }
-
-    fileInputStream.close();
-
-}
-
-/*
- * sendPacket sends the packet to the server
- *
- */
-int sendPacket(int clientSocket, int sequenceNumber) {
-
-    writeFileToPacket(sequenceNumber);
-
-    myPacket.valid = true;
-
-	int result = send(clientSocket, &myPacket, sizeof(myPacket), 0);
-	
-	//cout << "result of send:" << result << std::endl;
-
-	if (myPacket.sequenceNumber != -1) {
-		std::cout << "Sent Packet #" << myPacket.sequenceNumber << std::endl;
-	}
-	return result;
-/*	std::cout << "Sent Packet #" << myPacket.sequenceNumber << ": [ ";
-	for(int i = 0; i < packet_size; i++) {
-		std::cout << myPacket.contents[i];
-	}
-	std::cout << " ]" << std::endl;
-*/
-}
-
-
-/*
- * filePathPrompt takes the path to the file (to be sent) and saves it as a string
- */
-std::string userStringPrompt(std::string request) {
-
-	std::cout << request << std::endl;
-
-	std::string responseString;
-	std::getline(std::cin, responseString);
-
-	return responseString;
-
-}
-
-/*
- * userIntegerPrompt handles any user input where the returned value is an integer
- */
-int userIntegerPrompt(std::string request, bool restricted, int min, int max) {
-
-	std::string responseString;
-	std::cout << request << std::endl;
-	std::getline(std::cin, responseString);		
-	if (restricted) {
-		while (std::stoi(responseString) < min || std::stoi(responseString) > max) {
-			std::cout << std::endl << "Input must be between " << min << " and " << max << std::endl;
-			std::getline(std::cin, responseString);
-		}
-	}
-
-	return std::stoi(responseString);
-
-}
-
-/*
- * openFile calculates the number of packets that will be sent
- */
-int openFile() {
-
-    std::ifstream fileInputStream;
-
-    fileInputStream.open(file_path, std::ios_base::in | std::ios_base::binary);
-    if (fileInputStream.fail()) {
-        throw std::fstream::failure("Failed while opening file " + file_path);
-    }
-
-    fileInputStream.seekg(0, fileInputStream.end);
-    int fileSize = (int) fileInputStream.tellg();
-    int fileSizeRangeOfSequenceNumbers = fileSize / packet_size + 1;
-	
-	if (fileSizeRangeOfSequenceNumbers < 1) {
-		fileSizeRangeOfSequenceNumbers = 1;
-	} else if ((fileSize % packet_size) > 0) fileSizeRangeOfSequenceNumbers++;
-
-    std::cout << std::endl << "File to deliver: " << file_path << std::endl << "File size: " << fileSize << " bytes" << std::endl << std::endl;
-	//"good practice would be enter packet size in mb, bytes, etc"
-
-    fileInputStream.close();
-	
-	return fileSizeRangeOfSequenceNumbers;
+    return 0;
 
 }
