@@ -52,11 +52,12 @@ int main() {
 	//take user input
 	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
 
-	packet_size = userIntegerPrompt("Input desired packet size (bytes):", true, 1, 23333);
-	port_num = userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
-	timeout_interval = userIntegerPrompt("Input timeout interval:", true, 10, 40000);
-	sequence_range = userIntegerPrompt("Input sequence range:", true, 1, 9999999);
-	window_size = userIntegerPrompt("Input window size:", true, 1, sequence_range);
+	//TODO - remove the hard coding here
+	packet_size = 30;//userIntegerPrompt("Input desired packet size (bytes):", true, 1, 23333);
+	port_num = 9090;//userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
+	timeout_interval = 400000000;//userIntegerPrompt("Input timeout interval:", true, 10, 4000000);
+	sequence_range = 3000;//userIntegerPrompt("Input sequence range:", true, 1, 9999999);
+	window_size = 15;//userIntegerPrompt("Input window size:", true, 1, int(sequence_range/2));//Window size should never be greater than 1/2sr
 	//TODO
 	//situationalErrorsPrompt();
 	file_path = userStringPrompt("Input path of file to transfer:");
@@ -97,63 +98,70 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
     std::chrono::system_clock::time_point endTime;
 	//log the starting time
     startTime = std::chrono::system_clock::now();
-	
+
 	//connect to the server
     if ((client_fd = connect(clientSocket, (struct sockaddr*)&server_address, sizeof(server_address))) < 0) {
         printf("\nConnection Failed \n");
         exit(0);
     }
-	
+
 	num_packets = openFile();
-	//std::cout << std::endl << "Num packets:" << num_packets << std::endl;
+	std::cout << std::endl << "Num packets:" << num_packets << std::endl;
 	//TODO - memory efficiency, make this match the window somehow
-	//This has been worked out of the code ---- //bool received[num_packets] = { 0 };
 	
 	int SR_window[window_size];
 	bool sent[window_size] = { 0 }; //OPTIMIZE - this and next array could be simplified
 	std::chrono::_V2::system_clock::time_point sent_times[window_size];
 	
 	//populate SR_window with sequence numbers
-	for (int i = 0; i < window_size; i++)
-		SR_window[i] = i;
+	for (int i = 0; i < window_size; i++) {
+		if (i >= num_packets) {
+			SR_window[i] = -1;
+		} else {
+			SR_window[i] = i;
+		}
+	}
 
 	double sent_data;
+	//TODO - sequence range works with a loop around -> 0, 1, 2, 3, 0, 1, 2, 3 -> UNTIL DONE!
 
 	//Don't take poseidon down, just keep this failsafe implemented in case something fails but it keeps running
 	int FAILSAFE = 0;
     while(FAILSAFE < 1000000000) {
 		FAILSAFE++;
 
-        if(iterator >= sequence_range || iterator+1 >= num_packets) {
-			//temp is to accept the integer without doing anything with the value.
-            int temp = sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
-			//cout << "Final sequence number reached." << std::endl;
-            break;
-        }
-
 		//send the packet
-		if (sent[window_position] == 0){			
+		//TODO - infinite sending/rec with unreal packets. Maybe a check here - if > num_packets, break
+		if (SR_window[window_position] == -1) {
+			if(window_position == 0) {
+				sendPacket(clientSocket, FINAL_SEQUENCE_NUMBER);
+			}
+			window_position = 0;
+		}
+		if (sent[window_position] == 0){
 			//the packet hasn't been sent yet, send it
-			sent_data += sendPacket(clientSocket, window_position);
+			sent_data += sendPacket(clientSocket, SR_window[window_position]);
 			sent[window_position] = 1;
-			sent_times[window_position] = std::chrono::system_clock::now();
-
-		//TODO - make the comment below part of the code again, it should be working?
-		}/* else if ((std::chrono::system_clock::now() - sent_times[window_position]).count() > timeout_interval) {
+			sent_times[window_position] = std::chrono::system_clock::now();			
+			
+		} else if (SR_window[window_position] != -2 && (std::chrono::system_clock::now() - sent_times[window_position]).count() > timeout_interval) {
 			//the packet timed out, send again
 			std::cout << "** Packet " << SR_window[window_position] << " timed out. Sending again **" << std::endl;
-			sent_data += sendPacket(clientSocket, window_position);
+			sent_data += sendPacket(clientSocket, SR_window[window_position]);
 			sent_times[window_position] = std::chrono::system_clock::now();
 
-		} */else {
-			//the packet is currently being sent, or it was already accepted. Either way, check the next.
-			window_position = (window_position+1) % window_size;
 		}
+		//the packet is currently being sent, or it was already accepted. Either way, check the next.
+		window_position = (window_position+1) % window_size;
 
         Packet myAck{};
 
 		//check for acks
         if(recv(clientSocket, &myAck, sizeof(myAck), MSG_DONTWAIT) > 0) {
+			if (myAck.sequenceNumber == FINAL_SEQUENCE_NUMBER) {
+				if (iterator == num_packets) {break;}
+				else {continue;}
+			}
             std::cout << "Received ack #" << myAck.sequenceNumber << std::endl;
             iterator++;
 			//OPTIMIZE
@@ -163,28 +171,34 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
 					break;
 				}
 			}
-
+				
 			//check for window (does it need to move?)
 			//below logic => if received at the window's start is -1, then move window up until it isn't
 			if (SR_window[0] == -2) {
 				while (SR_window[0] == -2) {
 				//OPTIMIZE - while and for loop could be separated
-					for(int i=0; i<window_size; i++){
-						//if(SR_window[i]+1 < num_packets) {
-						if(i<window_size-1) {
-							SR_window[i] = SR_window[i+1];
-							sent[i] = sent[i+1];
-						} else {
-							SR_window[i] = SR_window[i]+1;
-							sent[window_size-1] = 0;
-						}
+					for(int i=0; i<window_size-1; i++){
+						SR_window[i] = SR_window[i+1];
+						sent[i] = sent[i+1];
 					}
+					if(SR_window[window_size-2] == -1) {
+						SR_window[window_size-1] = -1;
+					} else {
+						//TODO - test this logic, sequence_range
+						SR_window[window_size-1] = (SR_window[window_size-2] + 1) % sequence_range;
+					}
+					sent[window_size-1] = 0;
+					//FIX - the window position has to follow the moving window positions
+					window_position = (window_position-1) % window_size;
 				}
 				// Print the (new) current window
 				std::cout << "Current window: [";
 				for (int i = 0; i < window_size-1; i++) 
 					std::cout << SR_window[i] << ", ";
 				std::cout << SR_window[window_size-1] << "]" << std::endl;
+			}
+			if (SR_window[0] == -1 && myAck.sequenceNumber == -1) {
+				break;
 			}
 
         }
@@ -206,17 +220,6 @@ void executeSRProtocol(int clientSocket, sockaddr_in server_address) {
     std::cout << "Total execution time: " << elapsedSeconds.count() << std::endl;
     std::cout << "Total throughput (bps): " << sent_data/elapsedSeconds.count() << std::endl;
 
-
-/*
-	bool waiting = true;
-	while(true){
-		int result = recv(client_fd, &waiting, sizeof(waiting), MSG_DONTWAIT);
-		if (result > 0 && waiting == false) {
-			std::cout << "done" << std::endl;
-			break;
-		}
-	}
-*/
     close(client_fd);
 
 }

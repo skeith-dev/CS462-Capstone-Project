@@ -14,6 +14,7 @@
 int portNum; //port number of the target server
 int packetSize; //specified size of packets to be sent
 int slidingWindowSize;  //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
+int sequence_range; // TODO - explain this
 std::string filePath;
 
 std::string filePathPrompt();
@@ -33,9 +34,11 @@ int main() {
 	
 	std::cout << "Welcome to the scheduler. Provide the following information. \n" ;
 
-	portNum = userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
-	filePath = userStringPrompt("Enter path for file to write to:");
-	slidingWindowSize = userIntegerPrompt("Input window size:", true, 1, 10000);
+	//TODO - remove the hard coding here
+	portNum = 9090;//userIntegerPrompt("Input port number (9000-9999):", true, 9000, 9999);
+	filePath = "output.txt";//userStringPrompt("Enter path for file to write to:");
+	sequence_range = 30;//userIntegerPrompt("Input window size:", true, 1, 10000);
+	slidingWindowSize = 15;//userIntegerPrompt("Input window size:", true, 1, sequence_range/2);
 	std::cout<<std::endl;
 	
 	//create a socket
@@ -147,23 +150,25 @@ void executeSRProtocol(int serverSocket, int clientSize) {
         Packet myPacket{};
 
 		if(recv(serverSocket, &myPacket, sizeof(myPacket), MSG_DONTWAIT) > 0) {
+			if(myPacket.sequenceNumber == FINAL_SEQUENCE_NUMBER) {
+				sendAck(serverSocket, FINAL_SEQUENCE_NUMBER);
+				break;
+			}
 			if(myPacket.sequenceNumber < SR_window[0]) {
+				//std::cout << "Packet " << myPacket.sequenceNumber << " lost the ack, resend" << std::endl;
+				//sendAck(serverSocket, myPacket.sequenceNumber);
 				continue;
 			}
-			
-			//TODO
-/*            if(myPacket.sequenceNumber == FINAL_SEQUENCE_NUMBER) {
-                break;
-            }*/
 
             std::cout << "Packet " << myPacket.sequenceNumber << " recieved" << std::endl;
-            /*for(int i = 0; i < packetSize; i++) {
+			//PRINT CONTENTS(For debugging)
+			//HARD_DEBUG
+/*            for(int i = 0; i < sizeof(myPacket.contents); i++) {
                 std::cout << myPacket.contents[i];
             }
-            std::cout << " ]" << std::endl;*/
-
-//TODO - this is broken I think? I can't get the code to run still...
-			bool inArray = 0;
+            std::cout << " ]" << std::endl << std::endl;
+*/
+			//bool inArray = 0;//STRIKE
 			for (int i = 0; i < slidingWindowSize; i++) {
 				if (SR_window[i] == myPacket.sequenceNumber) {
 					sendAck(serverSocket, myPacket.sequenceNumber);
@@ -177,26 +182,25 @@ void executeSRProtocol(int serverSocket, int clientSize) {
 					break;
 				}
 			}
-			
-			//print the window
-			for (int i = 0; i < slidingWindowSize; i++)
-				std::cout << SR_window[i] << ", ";
-			std::cout << std::endl;
-						
+
 			//check if the window needs to move
 			if (SR_window[0] == -2) {
 				while (SR_window[0] == -2) {
 				//write the information to the file
 				writePacketToFile(true, packet_contents[0].contents);
 				//OPTIMIZE - while and for loop could be separated
-					for(int i=0; i<slidingWindowSize; i++){
-						if(i<slidingWindowSize-1) {
-							SR_window[i] = SR_window[i+1];
-						} else {
-							SR_window[i] = SR_window[i]+1;
-						}
+					for(int i=0; i<slidingWindowSize-1; i++){
+						SR_window[i] = SR_window[i+1];
+						packet_contents[i] = packet_contents[i+1];
 					}
+					SR_window[slidingWindowSize-1] = SR_window[slidingWindowSize-1] % sequence_range;
+					Packet tempPacket{};
+					packet_contents[slidingWindowSize-1] = tempPacket;
 				}
+				//print the window
+				for (int i = 0; i < slidingWindowSize; i++)
+					std::cout << SR_window[i] << ", ";
+				std::cout << std::endl;
 			} else if (SR_window[0] == FINAL_SEQUENCE_NUMBER) {//check if done
 				break;
 			}
