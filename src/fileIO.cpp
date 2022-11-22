@@ -35,15 +35,22 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
 
     //create char array for seqNum int
     char seqNumBytes[sizeof(int)];
-	for (int i=sizeof(int)-1; i >= 0; i--) {
-		if(seqNum - 127 > 0) {
-			seqNumBytes[i] = 127;
-			seqNum = seqNum - 127;
-		} else if (seqNum - 127 < 0){
-			seqNumBytes[i] = seqNum;
-			seqNum = 0;
-		} else {
-			seqNumBytes[i] = 0;
+	if (seqNum == -1) {
+		seqNumBytes[0] = 0;
+		seqNumBytes[1] = 1;
+		seqNumBytes[2] = 1;
+		seqNumBytes[3] = 0;
+	} else {
+		for (int i=sizeof(int)-1; i >= 0; i--) {
+			if(seqNum - 127 > 0) {
+				seqNumBytes[i] = 127;
+				seqNum = seqNum - 127;
+			} else if (seqNum - 127 < 0){
+				seqNumBytes[i] = seqNum;
+				seqNum = 0;
+			} else {
+				seqNumBytes[i] = 0;
+			}
 		}
 	}
     //create char array for valid bool

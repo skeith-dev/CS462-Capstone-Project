@@ -30,3 +30,18 @@ void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize) {
     }
 
 }
+
+void sendAck(int clientSocket, char ack[], int seqNum) {//ACK SIZE == 1 for now
+
+	//TODO - this will have to change when checksum is implemented (to include it in the header)
+    int length = (int) (sizeof(int) + sizeof(bool) + 1);
+    ssize_t result = send(clientSocket, ack, length, 0);
+		
+    if(result != -1) {
+        std::cout << "Sent Ack #" << seqNum << std::endl;
+        //printPacket(ack, 1);
+    } else {
+        std::cout << "Failed to send Ack #" << seqNum << "!" << std::endl;
+    }
+
+}

@@ -136,29 +136,21 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 			std::string packet_contents;
 
 			//this could be a function (probably unecessary, but it comes up in different files)
-			for (int i=0; i < sizeof(int); i++) {
-				packet_sequence_number += packet[i];
+			//get the sequence number of the packet
+			if (packet[0]==0 && packet[1]==1 && packet[2]==1 && packet[3]==0) {//final sequence num reached
+				packet_sequence_number = -1;
+			} else {//TODO - this is a rudimentary solution for the end of sequence
+				for (int i=0; i < sizeof(int); i++) {
+					packet_sequence_number += packet[i];
+				}				
 			}
-			
 			int length = (int) (sizeof(int) + sizeof(bool) + packet_size);
 			for(int i = sizeof(int)+1; i < length; i++) {
 				packet_contents = packet_contents + packet[i];
 			}
-	
-			//TODO - REMOVE AFTER TESTING
-			std::cout << "Complete packet: " << packet << std::endl;
-			std::cout << "Packet seq#: " << packet_sequence_number << std::endl;
-			std::cout << "packet valid: " << packet_valid << std::endl;
-			std::cout << "packet contents: " << packet_contents << std::endl;
 
 			//TODO - remove FINAL_SEQUENCE_NUMBER
 			if(packet_sequence_number == FINAL_SEQUENCE_NUMBER) {
-				//TODO - this should be a sendAck function. Add this to packetIO.cpp
-				int ack_packet_size = (int) (sizeof(int) + sizeof(bool) + 1);
-				char ack_packet[ack_packet_size];
-				ack_packet[sizeof(int)+sizeof(bool)+1] = 6;//ACK value
-				sendPacket(serverSocket, ack_packet, FINAL_SEQUENCE_NUMBER, 1);
-				//TODO - reimplement this -> sendAck(serverSocket, FINAL_SEQUENCE_NUMBER);
 				break;
 			}
 			//TODO - this doesn't work with sequence range logic, fix this. What if packet_sequence_number==0, and window[0]==13?
@@ -169,60 +161,69 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 				int ack_packet_size = (int) (sizeof(int) + sizeof(bool) + 1);
 				char ack_packet[ack_packet_size];
 				ack_packet[sizeof(int)+sizeof(bool)+1] = 6;//ACK value
-				sendPacket(serverSocket, ack_packet, packet_sequence_number, 1);
-				//TODO - reimplement this -> sendAck(serverSocket, packet_sequence_number);
+
+				//TODO - move everything here until sendAck() into sendAck(), it comes up multiple times
+				char packet_sequence_number_bytes[sizeof(int)];					
+				int temp_seq_num = packet_sequence_number;
+				
+				for (int i=sizeof(int)-1; i >= 0; i--) {
+					if(temp_seq_num - 127 > 0) {
+						packet_sequence_number_bytes[i] = 127;
+						temp_seq_num = temp_seq_num - 127;
+					} else if (temp_seq_num - 127 < 0){
+						packet_sequence_number_bytes[i] = temp_seq_num;
+						temp_seq_num = 0;
+					} else {
+						packet_sequence_number_bytes[i] = 0;
+					}
+				}
+				//write seqNum to ack
+				for(int i=0; i<sizeof(int); i++) {
+					ack_packet[i] = packet_sequence_number_bytes[i];
+				}
+				sendAck(serverSocket, ack_packet, packet_sequence_number);
+
 				continue;
+				//TODO - reimplement this -> sendAck(serverSocket, packet_sequence_number);
 			}
 
             std::cout << "Packet " << packet_sequence_number << " recieved" << std::endl;
-
-			bool EOW_found = false;//was the End of Window (-1) found?
-			
-			//if the received packet is the final packet
-			if (packet_sequence_number == FINAL_SEQUENCE_NUMBER) {
-				int finalSequenceNumber;
-				int pos=0;
-				//then find the sequence number of the final packet (STORED IN packet_contents)
-				//TODO_MERGE - after merge with spencer, remove the period. Use end of packet stuff instead (packet length?)
-				while (true) {
-					if (packet_contents[pos] = '.') {//TODO - change to EOT??? see packetIO.cpp
-						break;
-					}
-					pos++;
-				}
-				finalSequenceNumber = std::stoi(packet_contents.substr(0, pos));
-				
-				//TODO - remove prints after test
-				std::cout << "Final string pos:" << pos << std::endl;
-				std::cout << "Final string:" << packet_contents.substr(0, pos) << std::endl;
-				std::cout << "Final sequence number:" << finalSequenceNumber << std::endl;
-				exit(0);
-				
-				packet_sequence_number = finalSequenceNumber;
-			}
-			
+						
 			//find the index of the received packet, and send the ack
 			for (int i = 0; i < slidingWindowSize; i++) {
-				if (EOW_found) {
-					//TODO - does this work...?
-					SR_window[i] = FINAL_SEQUENCE_NUMBER;
-				} else if (SR_window[i] == packet_sequence_number) {
+				if (SR_window[i] == packet_sequence_number) {
 					//TODO - this should be a sendAck function. Add this to packetIO.cpp
 					int ack_packet_size = (int) (sizeof(int) + sizeof(bool) + 1);
 					char ack_packet[ack_packet_size];
-					ack_packet[-1] = 6;//ACK value
-					sendPacket(serverSocket, ack_packet, packet_sequence_number, 1);
+					ack_packet[ack_packet_size-1] = 6;//ACK value
+					
+					//TODO - move everything here until sendAck() into sendAck(), it comes up multiple times
+					char packet_sequence_number_bytes[sizeof(int)];					
+					int temp_seq_num = packet_sequence_number;
+					
+					for (int i=sizeof(int)-1; i >= 0; i--) {
+						if(temp_seq_num - 127 > 0) {
+							packet_sequence_number_bytes[i] = 127;
+							temp_seq_num = temp_seq_num - 127;
+						} else if (temp_seq_num - 127 < 0){
+							packet_sequence_number_bytes[i] = temp_seq_num;
+							temp_seq_num = 0;
+						} else {
+							packet_sequence_number_bytes[i] = 0;
+						}
+					}
+					//write seqNum to ack
+					for(int i=0; i<sizeof(int); i++) {
+						ack_packet[i] = packet_sequence_number_bytes[i];
+					}
+
+					sendAck(serverSocket, ack_packet, packet_sequence_number);
 
 					//TODO - reimplement this -> sendAck(serverSocket, packet_sequence_number);
 					received_packet_contents[i] = packet_contents;
 					iterator++;
-					if (packet_sequence_number == FINAL_SEQUENCE_NUMBER) {
-						SR_window[i] = FINAL_SEQUENCE_NUMBER;
-						EOW_found = true;
-					} else {
-						SR_window[i] = -2;
-						break;
-					}
+					SR_window[i] = -2;
+					break;
 				}
 			}
 
@@ -241,16 +242,14 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 					//If -2, it was received
 					if (SR_window[slidingWindowSize-1] == -2) {
 						SR_window[slidingWindowSize-1] = SR_window[slidingWindowSize-1]+1;
-					}// else if () {//if -1, it is the last
-						//TODO - I don't remember what's going on here, but it's unfinished logic somehow
-						// It's part of the rework to remove FINAL_SEQUENCE_NUMBER. Remove FINAL_SEQUENCE_NUMBER
-//					}
+					}
 					received_packet_contents[slidingWindowSize-1] = 'NULL';
 				}
 				//print the window
+				std::cout << "receiver window: [";
 				for (int i = 0; i < slidingWindowSize; i++)
 					std::cout << SR_window[i] << ", ";
-				std::cout << std::endl;
+				std::cout << "]" << std::endl;
 			} else if (SR_window[0] == FINAL_SEQUENCE_NUMBER) {//check if done
 				break;
 			}

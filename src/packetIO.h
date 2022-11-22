@@ -27,5 +27,6 @@ void printPacket(char packet[], int packetSize);
  * @param packetSize The size of the packet CONTENTS; does NOT include seqNum and valid bytes
  */
 void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize);
+void sendAck(int clientSocket, char packet[], int seqNum);
 
 #endif //UWEC_CS462_CAPSTONE_PROJECT_PACKETIO_H

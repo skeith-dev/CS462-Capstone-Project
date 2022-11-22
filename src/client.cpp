@@ -46,7 +46,7 @@
 void stopAndWaitProtocol();
 
 void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address);
-int packet_size, timeout_interval, window_size, sequence_range, port_num, num_packets, fileSize, fileSizeRangeOfSeqNums, slidingWindowSize;
+int packet_size, timeout_interval, window_size, sequence_range, port_num, fileSize, fileSizeRangeOfSeqNums, slidingWindowSize;
 std::string filePath;
 
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
@@ -85,7 +85,7 @@ int main() {
         packet_size = 30;//userIntPrompt("Size of packets:", 1, INT_MAX);
 
         //user-specified (0+) or default (-1)
-        timeout_interval = 99999;//userIntPrompt("Timeout interval, user-specified or ping calculated (-1):", -1, INT_MAX);
+        timeout_interval = 9999999;//userIntPrompt("Timeout interval, user-specified or ping calculated (-1):", -1, INT_MAX);
         //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
 
 		//TODO - he says not infinite, but the max could really be anything
@@ -113,7 +113,11 @@ int main() {
         fileSize = openFile(filePath);
         //the range of sequence numbers necessary to send the whole file
 		//TODO - rework this for true sequence numbers. The range required doesn't apply to SR, but we should need the var below
-        fileSizeRangeOfSeqNums = fileSize / packet_size + fileSize % packet_size;
+        fileSizeRangeOfSeqNums = fileSize / packet_size;//+ fileSize % packet_size;
+		if (fileSizeRangeOfSeqNums < 1) {
+			fileSizeRangeOfSeqNums = 1;
+		} else if ((fileSize % packet_size) > 0) fileSizeRangeOfSeqNums++;
+
         //ex. (sliding window size = 3) [1, 2, 3] -> [2, 3, 4] -> [3, 4, 5], range = 5
 //        std::stringstream ss;
 //        ss << "Range of sequence numbers (" << fileSizeRangeOfSeqNums << " required to send entire file):";
@@ -162,23 +166,24 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
         exit(0);
     }// TODO - is this good to remove now?
 
-	num_packets = openFile(filePath);
-	std::cout << std::endl << "Num packets:" << num_packets << std::endl;
+	//num_packets = openFile(filePath);
+	//TODO - is this fixed?
+	std::cout << std::endl << "Num packets:" << fileSizeRangeOfSeqNums << std::endl;
 	
 	int SR_window[window_size];
-	bool sent[window_size] = { 0 }; //0==unsent,1==sent,2==received    ...and, -1==END???
+	int status[window_size] = { 0 }; //0==unsent,1==sent,2==received,-1==END
 	std::chrono::_V2::system_clock::time_point sent_times[window_size];
 	
 	//populate SR_window with sequence numbers
 	for (int i = 0; i < window_size; i++) {
-		//TODO - we can leave this, and just have the final packet include an EOF char, but we have to do that then
-		//This relates to removing FINAL_SEQUENCE_NUMBER
+		if (i >= fileSizeRangeOfSeqNums) {
+			status[i] = FINAL_SEQUENCE_NUMBER;
+		} else {
+			status[i] = 0;
+		}
 		SR_window[i] = i;
-//		if (i >= num_packets) {
-//			SR_window[i] = -1;
-//		} else ...
 	}
-
+	
 	double sent_data;
 	//TODO - sequence range works with a loop around -> 0, 1, 2, 3, 0, 1, 2, 3 -> UNTIL DONE!
 	
@@ -189,58 +194,21 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
     while(FAILSAFE < 1000000000) {
 		FAILSAFE++;
 
-		//TEMP - remove this
-		std::cout << std::endl << std::endl;
-		std::cout << "SR Window: [";
-		for (int i = 0; i < window_size; i++) {
-			std::cout << SR_window[i] << ", ";
-		}
-		std::cout << "]" << std::endl << std::endl << std::endl;
-
 		//send the packet
 		//TODO - infinite sending/rec with unreal packets. Maybe a check here - if > num_packets, break
-		if (SR_window[window_position] == -1 && sent[window_position] == 0) {//TODO - this if isn't doing anything, remove...
-			if(window_position == 0) {
-				//TODO - remove packets! - do at all sendPacket() calls
-				//sendPacket(clientSocket, SR_window[window_position], false);
-
-				//TODO - sequence range loops, make writeFileToPacket work with that
-				//	loop for sequence_range==4 -> [0, 1, 2, 3, 0, 1, 2, 3, 0, ...]
-				
-				//TODO - this should be sending FINAL_SEQUENCE_NUMBER. Make sure this actually sends that
-				int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
-				char packet[packetArrSize];
-				writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], iterator, packet_size, fileSizeRangeOfSeqNums);
-				sendPacket(clientSocket, packet, SR_window[window_position], packet_size);
-				
-				//log that the packet was sent, and the time which it was sent
-				sent[window_position] = 1;
-				sent_times[window_position] = std::chrono::system_clock::now();
-				
-			} else {
-				window_position = 0;
-			}
-		} else if (sent[window_position] == 0){
+		if (status[window_position] == 0 && status[window_position] != FINAL_SEQUENCE_NUMBER){
 			//the packet hasn't been sent yet, send it
-			//sent_data += sendPacket(clientSocket, SR_window[window_position], true);
-			//TODO -> fix sent_data
-			//TODO -> make the lines below a function maybe??
 			int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
 			char packet[packetArrSize];
 			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], iterator, packet_size, fileSizeRangeOfSeqNums);
+			//TODO - sendPacket should return the number of bytes sent for calculations. Add to sent_data double.
 			sendPacket(clientSocket, packet, SR_window[window_position], packet_size);
 
-			std::cout << std::endl << "Window position: " << window_position << std::endl;
-			std::cout << "SR Window: [";
-			for (int i = 0; i < window_size; i++) {
-				std::cout << SR_window[i] << ", ";
-			}
-			std::cout << "]" << std::endl << std::endl << std::endl;
-			sent[window_position] = 1;
+			status[window_position] = 1;
 			sent_times[window_position] = std::chrono::system_clock::now();
 			
-		} else if (SR_window[window_position] != -2 && (std::chrono::system_clock::now() - sent_times[window_position]).count() > timeout_interval) {
-			//the packet timed out, send again
+		} else if (status[window_position] == 1 && (std::chrono::system_clock::now() - sent_times[window_position]).count() > timeout_interval) {
+			//the packet was sent and timed out, send again
 			std::cout << "** Packet " << SR_window[window_position] << " timed out. Sending again **" << std::endl;
 
 			int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
@@ -252,7 +220,6 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 
 		}
 		//the packet is currently being sent, or it was already accepted. Either way, check the next.
-		//i.e. -> increment window_position along, making sure to never go above window_size
 		window_position = (window_position+1) % window_size;
 
 		int packetArrSize = (int) (1 + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)? Not for getting acks...
@@ -261,67 +228,85 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 		//check for acks
         if(recv(clientSocket, &ack, sizeof(ack), MSG_DONTWAIT) > 0) {
 			//TODO - checksum changes here too
-			int ack_sequence_number;
+			int ack_sequence_number = 0;
 			bool ack_valid = int(ack[sizeof(int)]);
 
 			//this could be a function (probably unecessary, but it comes up in different files)
 			//get the sequence number of the ack
-			for (int i=0; i < sizeof(int); i++) {
-				ack_sequence_number += ack[i];
+			if (ack[0]==0 && ack[1]==1 && ack[2]==1 && ack[3]==0) {//final sequence num reached
+				ack_sequence_number = -1;
+			} else {//TODO - this is a poor solution for the end of sequence, max 508
+				for (int i=0; i < sizeof(int); i++) {
+					ack_sequence_number += ack[i];
+				}
 			}
-			
-			//TODO - remove this, *ONLY* process FINAL_SEQUENCE_NUMBER at window shifting, it's easier!
-			if (ack_sequence_number == FINAL_SEQUENCE_NUMBER) {
 
-				//TODO - does num_packets still work???
-				//TODO - remove this now
-				if (iterator == num_packets) {break;}
-				else {continue;}
+			if (ack_sequence_number == FINAL_SEQUENCE_NUMBER) {
+				continue;
+			}
+			//if the ack is outside the window, something is wrong... Skip this iteration
+			if(ack_sequence_number < SR_window[0]) {//TODO - true SR, add ->  || ack_sequence_number > SR_window[window_size-1]
+				continue;
 			}
             std::cout << "Received ack #" << ack_sequence_number << std::endl;
             iterator++;
 			//OPTIMIZE
-			//find the location of the acked packet, and signify that the packet was acked
-
-			//TODO - error case, drop the ack here or accept it by running the for loop below (or does that happen in server?)
-			//if (ack_valid) {} else {//print that ack was dropped intentionally}
 			for(int index = 0; index < window_size; index++) {
 				if(ack_sequence_number == SR_window[index]) {
-					SR_window[index] = -2;
+					status[index] = 2;
 					break;
 				}
 			}
-				
+	
 			//check for window (does it need to move?)
-			//below logic => if received at the window's start is -2, then move window up until it isn't
-			if (SR_window[0] == -2) {
-				while (SR_window[0] == -2) {
+			//below logic => if received at the window's start is -1, then move window up until it isn't
+			if (status[0] == 2) {
+				while (status[0] == 2) {
 				//OPTIMIZE - while and for loop could be separated
 					for(int i=0; i<window_size-1; i++){
 						SR_window[i] = SR_window[i+1];
-						sent[i] = sent[i+1];
+						sent_times[i] = sent_times[i+1];
+						status[i] = status[i+1];
+
 					}
-					if(SR_window[window_size-2] == -1) {
-						SR_window[window_size-1] = -1;
-					} else if (SR_window[window_size-2] > sequence_range) {
-						SR_window[window_size-1] = 0;
+					
+					//TODO - delete this printing stuff
+					std::cout << "Status window:";
+					for(int i=0; i<window_size; i++){
+						std::cout << status[i] << ", ";
+					}
+					std::cout << std::endl;
+
+					if (status[window_size-1] == FINAL_SEQUENCE_NUMBER) {						
+						status[window_size-1] = FINAL_SEQUENCE_NUMBER;
 					} else {
-						//TODO - test this logic, sequence_range
-						SR_window[window_size-1] = (SR_window[window_size-2] + 1) % sequence_range;
+						status[window_size-1] = 0;
 					}
-					sent[window_size-1] = 0;
-					//FIX - the window position has to follow the moving window positions
+					SR_window[window_size-1] = SR_window[window_size-1]+1;
+
+					if (SR_window[window_size-1] >= sequence_range) {
+						SR_window[window_size-1] == 0;
+					}
 					window_position = window_position-1;
 					if (window_position < 0) window_position = window_size-1;
 				}
+				//TODO: MOVE ALL OF THIS PAST THE WHILE LOOP!!!!
 				// Print the (new) current window
 				std::cout << "Current window: [";
 				for (int i = 0; i < window_size-1; i++) 
 					std::cout << SR_window[i] << ", ";
 				std::cout << SR_window[window_size-1] << "]" << std::endl;
 			}
-			//TODO - every single "-1"
-			if (SR_window[0] == FINAL_SEQUENCE_NUMBER && ack_sequence_number == FINAL_SEQUENCE_NUMBER) {
+			
+			//if all packets sent, break
+			if (iterator == fileSizeRangeOfSeqNums) {
+				std::cout << "done" << std::endl;
+
+				int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
+				char packet[packetArrSize];
+				writeFileToPacket(packet, filePath, fileSize, FINAL_SEQUENCE_NUMBER, iterator, packet_size, fileSizeRangeOfSeqNums);
+				sendPacket(clientSocket, packet, FINAL_SEQUENCE_NUMBER, packet_size);
+
 				break;
 			}
 
@@ -330,6 +315,7 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 		
 		//end of while loop
     }
+
 
 	if(FAILSAFE >= 1000000000){
 		std::cout << std::endl << "Program timed out (failsafe for Poseidon stopped the code)." << std::endl;
@@ -347,3 +333,4 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
     close(client_fd);
 
 }
+
