@@ -60,6 +60,7 @@ int main() {
     char packet[15];
     read(clientSocket, packet, sizeof(packet));
 
+    std::cout << "Received packet:" << std::endl;
     printPacket(packet, 10);
 
 }
