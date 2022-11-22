@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include "prompts.h"
 #include "fileIO.h"
+#include "packetIO.h"
 
 #define FINAL_SEQUENCE_NUMBER -1
 
@@ -14,7 +15,7 @@
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
 //Function declarations                          //*****//*****//*****//
 
-void stopAndWaitProtocol();
+void stopAndWaitProtocol(int clientSocket, int packetSize, const std::string& filePath);
 
 void selectiveRepeatProtocol();
 
@@ -83,7 +84,7 @@ int main() {
         switch (protocolType) {
             case 0:
                 std::cout << std::endl << "Executing Stop & Wait protocol..." << std::endl << std::endl;
-                //executeSAW_GBNProtocol(serverSocket, clientAddress, packetSize);
+                stopAndWaitProtocol(clientSocket, packetSize, filePath);
                 break;
             case 1:
                 std::cout << std::endl << "Executing Selective Repeat protocol..." << std::endl << std::endl;
@@ -93,7 +94,45 @@ int main() {
                 break;
         }
 
-        quit = userBoolPrompt("Would you like to exit (1), or perform another file transfer (0):");
+        quit = userBoolPrompt("\nWould you like to exit (1), or perform another file transfer (0):");
     } while(!quit);
+
+}
+
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//Network protocols (algorithms)
+
+void stopAndWaitProtocol(int clientSocket, int packetSize, const std::string& filePath) {
+
+    char packet[ sizeof(int) + packetSize ];
+    char ack[ sizeof(int) ];
+    int iterator = 0;
+    while(true) {
+
+        if(read(clientSocket, packet, sizeof(packet)) != -1) {
+
+            int packetSeqNum;
+            std::memcpy(&packetSeqNum, &packet, sizeof(int));
+            if(packetSeqNum == FINAL_SEQUENCE_NUMBER) {
+                break;
+            }
+
+            std::cout << "Received packet #" << packetSeqNum << "! ";
+            printPacket(packet, packetSize);
+
+            if(packetSeqNum <= iterator) {
+                std::copy(static_cast<const char*>(static_cast<const void*>(&packetSeqNum)),
+                          static_cast<const char*>(static_cast<const void*>(&packetSeqNum)) + sizeof(packetSeqNum),
+                          ack);
+                sendAck(clientSocket, ack, packetSeqNum);
+                appendPacketToFile(packet, packetSize, filePath);
+                iterator++;
+            } else {
+                std::cout << "Received packet is corrupted!" << std::endl;
+            }
+
+        }
+
+    }
 
 }

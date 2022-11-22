@@ -5,9 +5,10 @@
 #include <iostream>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <sstream>
 #include "prompts.h"
 #include "fileIO.h"
+#include "packetIO.h"
+#include "sitErrors.h"
 
 #define FINAL_SEQUENCE_NUMBER -1
 
@@ -15,9 +16,9 @@
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
 //Function declarations                          //*****//*****//*****//
 
-void stopAndWaitProtocol();
+void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int fileSize, int numOfPackets, int packetSize, int timeoutInterval, const std::vector<int>& sitErrorsIterations);
 
-void selectiveRepeatProtocol();
+//void selectiveRepeatProtocol();
 
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
 //Function implementations (including main)      //*****//*****//*****//
@@ -53,17 +54,21 @@ int main() {
         int timeoutInterval = userIntPrompt("Timeout interval, user-specified or ping calculated (-1):", -1, INT_MAX);
         //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
         int slidingWindowSize;
+        //ex. (sliding window size = 3) [1, 2, 3] -> [2, 3, 4] -> [3, 4, 5], range = 5
+        int rangeOfSeqNums;
         if(protocolType > 0) {
             slidingWindowSize = userIntPrompt("Size of sliding window:", 1, MAX_INPUT);
+            rangeOfSeqNums = userIntPrompt("Range of sequence numbers: ", 1, slidingWindowSize / 2);
         }
         //none (0), randomly generated (1), or user-specified (2)
-        int situationalErrors = userIntPrompt("Situational errors; none (0), randomly generated (1), or user-specified (2):", 0, 2);
-        switch(situationalErrors) {
+        std::vector<int> sitErrorsIterations;
+        int sitErrors = userIntPrompt("Situational errors; none (0), randomly generated (1), or user-specified (2):", 0, 2);
+        switch(sitErrors) {
             case 1:
-                //generateRandomSitErrors();
+                generateRandomSitErrors(sitErrorsIterations);
                 break;
             case 2:
-                //generateUserSituationalErrors();
+                generateUserSitErrors(sitErrorsIterations);
                 break;
             default:
                 break;
@@ -73,17 +78,13 @@ int main() {
 
         //size of file in bytes
         int fileSize = openFile(filePath);
-        //the range of sequence numbers necessary to send the whole file
-        int fileSizeRangeOfSeqNums = fileSize / packetSize + fileSize % packetSize;
-        //ex. (sliding window size = 3) [1, 2, 3] -> [2, 3, 4] -> [3, 4, 5], range = 5
-        std::stringstream ss;
-        ss << "Range of sequence numbers (" << fileSizeRangeOfSeqNums << " required to send entire file):";
-        int rangeOfSeqNums = userIntPrompt(ss.str(), 1, fileSizeRangeOfSeqNums);
+        //the number of packets necessary to send the whole file
+        int numOfPackets = fileSize / packetSize + fileSize % packetSize;
 
         switch (protocolType) {
             case 0:
                 std::cout << std::endl << "Executing Stop & Wait protocol..." << std::endl << std::endl;
-                //executeSAWProtocol(clientSocket, serverAddress);
+                stopAndWaitProtocol(clientSocket, filePath, fileSize, numOfPackets, packetSize, timeoutInterval, sitErrorsIterations);
                 break;
             case 1:
                 std::cout << std::endl << "Executing Selective Repeat protocol..." << std::endl << std::endl;
@@ -93,9 +94,82 @@ int main() {
                 break;
         }
 
-        quit = userBoolPrompt("Would you like to exit (1), or perform another file transfer (0):");
+        quit = userBoolPrompt("\nWould you like to exit (1), or perform another file transfer (0):");
     } while (!quit);
 
     return 0;
+
+}
+
+//*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
+//Network protocols (algorithms)
+
+void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int fileSize, int numOfPackets, int packetSize, int timeoutInterval, const std::vector<int>& sitErrorsIterations) {
+
+    for(int sitErrorsIteration : sitErrorsIterations) {
+        std::cout << sitErrorsIteration;
+    }
+    std::cout << std::endl;
+
+    std::chrono::system_clock::time_point startTime;
+    std::chrono::system_clock::time_point endTime;
+
+    std::chrono::system_clock::time_point timerStart;
+
+
+    startTime = std::chrono::system_clock::now();
+
+    char packet[ sizeof(int) + packetSize ];
+    char ack[ sizeof(int) ];
+    bool outstanding = false;
+    int iterator = 0;
+    int sitErrorsIterator = 0;
+    while(true) {
+
+        if(iterator > numOfPackets - 1) {
+            writeFinalPacket(packet, packetSize);
+            sendPacket(clientSocket, packet, FINAL_SEQUENCE_NUMBER, packetSize);
+            break;
+        }
+
+        if(!outstanding) {
+            writeFileToPacket(packet, filePath, fileSize, iterator, packetSize, numOfPackets);
+            if(!checkIfDropPacket(sitErrorsIterator, sitErrorsIterations)) {
+                sendPacket(clientSocket, packet, iterator, packetSize);
+            } else {
+                std::cout << "Dropping Packet #" << iterator << std::endl;
+            }
+            sitErrorsIterator++;
+            timerStart = std::chrono::system_clock::now();
+            outstanding = true;
+        }
+
+        if(recv(clientSocket, ack, (sizeof(int)), MSG_DONTWAIT) != -1) {
+            int ackSeqNum;
+            std::memcpy(&ackSeqNum, &ack, sizeof(int));
+            std::cout << "Received ack #" << ackSeqNum << std::endl;
+            iterator = ackSeqNum + 1;
+            timerStart = std::chrono::system_clock::now();
+            outstanding = false;
+        }
+
+        std::chrono::duration<double> timer = std::chrono::system_clock::now() - timerStart;
+        if(timer.count() >= timeoutInterval) {
+            std::cout << "Timed out! " << timer.count() << " > " << timeoutInterval << " (timeout interval)" << std::endl;
+            timerStart = std::chrono::system_clock::now();
+            writeFileToPacket(packet, filePath, fileSize, iterator, packetSize, numOfPackets);
+            if(!checkIfDropPacket(sitErrorsIterator, sitErrorsIterations)) {
+                sendPacket(clientSocket, packet, iterator, packetSize);
+            } else {
+                std::cout << "Dropping Packet #" << iterator << std::endl;
+            }
+            sitErrorsIterator++;
+        }
+
+    }
+
+    endTime = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsedSeconds = endTime - startTime;
+    std::cout << std::endl << "Total execution time = " << elapsedSeconds.count() << std::endl;
 
 }

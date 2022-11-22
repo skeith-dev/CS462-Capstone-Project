@@ -16,15 +16,10 @@
  */
 int openFile(const std::string& filePath);
 
-/**
- *
- * @param packet
- * @param filePath
- * @param fileSize
- * @param seqNum
- * @param packetSize
- * @param fileSizeRangeOfSeqNums
- */
 void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int seqNum, int packetSize, int fileSizeRangeOfSeqNums);
+
+void writeFinalPacket(char packet[], int packetSize);
+
+void appendPacketToFile(const char packet[], int packetSize, const std::string& filePath);
 
 #endif //UWEC_CS462_CAPSTONE_PROJECT_FILEIO_H

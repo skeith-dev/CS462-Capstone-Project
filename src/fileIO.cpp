@@ -4,6 +4,8 @@
 
 #include "fileIO.h"
 
+#define FINAL_SEQUENCE_NUMBER -1
+
 
 int openFile(const std::string& filePath) {
 
@@ -40,7 +42,10 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
               seqNumBytes);
     //create char array for file contents
     char contentsBytes[packetSize];
-    if(seqNum + 1 < fileSizeRangeOfSeqNums) {
+    for(int i = 0; i < packetSize; i++) {
+        contentsBytes[i] = '\0';
+    }
+    if(seqNum < fileSizeRangeOfSeqNums) {
         fileInputStream.read(contentsBytes, packetSize);
     } else {
         int remainingBytes = fileSize - (seqNum * packetSize);
@@ -56,5 +61,47 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
     }
 
     fileInputStream.close();
+
+}
+
+void writeFinalPacket(char packet[], int packetSize) {
+
+    //create char array for FINAL_SEQUENCE_NUMBER
+    int seqNum = FINAL_SEQUENCE_NUMBER;
+    char seqNumBytes[sizeof(int)];
+    std::copy(static_cast<const char*>(static_cast<const void*>(&seqNum)),
+              static_cast<const char*>(static_cast<const void*>(&seqNum)) + sizeof(seqNum),
+              seqNumBytes);
+    //construct char array "packet"
+    for(int i = 0; i < sizeof(int); i++) {
+        packet[i] = seqNumBytes[i];
+    }
+    for(int i = 0; i < packetSize; i++) {
+        packet[i + sizeof(int)] = '\0';
+    }
+
+}
+
+void appendPacketToFile(const char packet[], int packetSize, const std::string& filePath) {
+
+    std::ofstream fileOutputStream;
+    fileOutputStream.open(filePath, std::ios_base::app);
+
+    char contents[packetSize];
+    for(int i = 0; i < packetSize; i++) {
+        if(packet[sizeof(int) + i] != '\0') {
+            contents[i] = packet[sizeof(int) + i];
+        } else {
+            contents[i] = '\0';
+        }
+    }
+    //without the line below, extra characters are printed because the fileOutputStream
+    //does not know where to terminate
+    contents[packetSize] = '\0';
+    std::string message(contents);
+
+    fileOutputStream << message;
+
+    fileOutputStream.close();
 
 }

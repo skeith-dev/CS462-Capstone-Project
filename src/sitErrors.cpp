@@ -5,7 +5,7 @@
 #include "sitErrors.h"
 
 
-void generateRandomSitErrors(std::vector<int> sitErrorsIterations) {
+void generateRandomSitErrors(std::vector<int> &sitErrorsIterations) {
 
     srand(time(nullptr)); // NOLINT(cert-msc51-cpp)
 
@@ -29,7 +29,7 @@ void generateRandomSitErrors(std::vector<int> sitErrorsIterations) {
 
 }
 
-void generateUserSitErrors(std::vector<int> sitErrorsIterations) {
+void generateUserSitErrors(std::vector<int> &sitErrorsIterations) {
 
     std::string droppedPacketString;
     int droppedPacketCount;
@@ -58,7 +58,6 @@ void generateUserSitErrors(std::vector<int> sitErrorsIterations) {
 bool checkIfDropPacket(int sitErrorsIterator, const std::vector<int>& sitErrorsIterations) {
 
     for(int situationalErrorsIteration : sitErrorsIterations) {
-        //sitErrorsIterator must be above 1; if 1 is allowed, then every 1st packet could be dropped (aka, EVERY packet)
         if(sitErrorsIterator > 1 && sitErrorsIterator % situationalErrorsIteration == 0) {
             std::cout << sitErrorsIterator << " % " << situationalErrorsIteration << " = " << 0 << std::endl;
             return true;

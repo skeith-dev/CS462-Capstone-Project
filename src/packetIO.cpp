@@ -16,6 +16,16 @@ void printPacket(char packet[], int packetSize) {
 
 }
 
+void printAck(char ack[]) {
+
+    std::cout << "[ ";
+    for(int i = 0; i < sizeof(int); i++) {
+        std::cout << ack[i];
+    }
+    std::cout << " ]" << std::endl;
+
+}
+
 void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize) {
 
     int length = (int) (sizeof(int) + packetSize);
@@ -26,6 +36,20 @@ void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize) {
         printPacket(packet, packetSize);
     } else {
         std::cout << "Failed to send Packet #" << seqNum << "!" << std::endl;
+    }
+
+}
+
+void sendAck(int clientSocket, char ack[], int seqNum) {
+
+    int length = sizeof(int);
+    ssize_t result = send(clientSocket, ack, length, 0);
+
+    if(result != -1) {
+        std::cout << "Send Ack #" << seqNum << ": ";
+        printAck(ack);
+    } else {
+        std::cout << "Failed to send Ack #" << seqNum << "!" << std::endl;
     }
 
 }

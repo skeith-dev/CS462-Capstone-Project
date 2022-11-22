@@ -9,9 +9,9 @@
 #include <vector>
 
 
-void generateRandomSitErrors(std::vector<int> sitErrorsIterations);
+void generateRandomSitErrors(std::vector<int> &sitErrorsIterations);
 
-void generateUserSitErrors(std::vector<int> sitErrorsIterations);
+void generateUserSitErrors(std::vector<int> &sitErrorsIterations);
 
 bool checkIfDropPacket(int sitErrorsIterator, const std::vector<int>& sitErrorsIterations);
 
