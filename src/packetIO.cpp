@@ -21,7 +21,7 @@ void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize) {
 	//TODO - this will have to change when checksum is implemented (to include it in the header)
     int length = (int) (sizeof(int) + sizeof(bool) + packetSize);
     ssize_t result = send(clientSocket, packet, length, 0);
-
+	
     if(result != -1) {
         std::cout << "Sent Packet #" << seqNum << ": ";
         printPacket(packet, packetSize);

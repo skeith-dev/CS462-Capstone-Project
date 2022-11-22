@@ -131,27 +131,32 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 
 		if(recv(serverSocket, &packet, sizeof(packet), MSG_DONTWAIT) > 0) {//TODO - sizeof(packet) could just be packetArrSize?
 
-			std::cout << "Packet: " << packet << std::endl;
-		
-			std::string packet_str(packet);
-			int packet_sequence_number = std::stoi(packet_str.substr(0, sizeof(int)));
-			bool packet_valid = std::stoi(packet_str.substr(sizeof(int), sizeof(bool)));
-			//TODO - this is where checksum would be taken out
-			std::string packet_contents = packet_str.substr((int) (sizeof(int) + sizeof(bool)));//this should give the packet contents
+			int packet_sequence_number = 0;
+			bool packet_valid = int(packet[sizeof(int)]);
+			std::string packet_contents;
 
+			//this could be a function (probably unecessary, but it comes up in different files)
+			for (int i=0; i < sizeof(int); i++) {
+				packet_sequence_number += packet[i];
+			}
+			
+			int length = (int) (sizeof(int) + sizeof(bool) + packet_size);
+			for(int i = sizeof(int)+1; i < length; i++) {
+				packet_contents = packet_contents + packet[i];
+			}
+	
 			//TODO - REMOVE AFTER TESTING
 			std::cout << "Complete packet: " << packet << std::endl;
 			std::cout << "Packet seq#: " << packet_sequence_number << std::endl;
 			std::cout << "packet valid: " << packet_valid << std::endl;
 			std::cout << "packet contents: " << packet_contents << std::endl;
-			exit(0);
 
 			//TODO - remove FINAL_SEQUENCE_NUMBER
 			if(packet_sequence_number == FINAL_SEQUENCE_NUMBER) {
 				//TODO - this should be a sendAck function. Add this to packetIO.cpp
 				int ack_packet_size = (int) (sizeof(int) + sizeof(bool) + 1);
 				char ack_packet[ack_packet_size];
-				ack_packet[-1] = 6;//ACK value
+				ack_packet[sizeof(int)+sizeof(bool)+1] = 6;//ACK value
 				sendPacket(serverSocket, ack_packet, FINAL_SEQUENCE_NUMBER, 1);
 				//TODO - reimplement this -> sendAck(serverSocket, FINAL_SEQUENCE_NUMBER);
 				break;
@@ -163,7 +168,7 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 				//TODO - this should be a sendAck function. Add this to packetIO.cpp
 				int ack_packet_size = (int) (sizeof(int) + sizeof(bool) + 1);
 				char ack_packet[ack_packet_size];
-				ack_packet[-1] = 6;//ACK value //TODO - do we want ack values? No real need for it, but it uses the space
+				ack_packet[sizeof(int)+sizeof(bool)+1] = 6;//ACK value
 				sendPacket(serverSocket, ack_packet, packet_sequence_number, 1);
 				//TODO - reimplement this -> sendAck(serverSocket, packet_sequence_number);
 				continue;

@@ -25,7 +25,7 @@ int openFile(const std::string& filePath);
  * @param packetSize
  * @param fileSizeRangeOfSeqNums
  */
-void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int seqNum, int packetSize, int fileSizeRangeOfSeqNums);
+void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int seqNum, int iterator, int packetSize, int fileSizeRangeOfSeqNums);
 
 void writePacketToFile(bool append, const std::string& message, const std::string& filePath);
 

@@ -95,7 +95,7 @@ int main() {
             window_size = 10;//userIntPrompt("Size of sliding window:", 1, sequence_range/2);
         }
         //none (0), randomly generated (1), or user-specified (2)
-        int situationalErrors = userIntPrompt("Situational errors; none (0), randomly generated (1), or user-specified (2):", 0, 2);
+        int situationalErrors = 0;//userIntPrompt("Situational errors; none (0), randomly generated (1), or user-specified (2):", 0, 2);
         switch(situationalErrors) {
             case 1:
                 //generateRandomSitErrors();
@@ -166,7 +166,7 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 	std::cout << std::endl << "Num packets:" << num_packets << std::endl;
 	
 	int SR_window[window_size];
-	int status[window_size] = { 0 }; //0==unsent,1==sent,2==received    ...and, -1==END???
+	bool sent[window_size] = { 0 }; //0==unsent,1==sent,2==received    ...and, -1==END???
 	std::chrono::_V2::system_clock::time_point sent_times[window_size];
 	
 	//populate SR_window with sequence numbers
@@ -227,7 +227,7 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 			//TODO -> make the lines below a function maybe??
 			int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
 			char packet[packetArrSize];
-			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], packet_size, fileSizeRangeOfSeqNums);
+			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], iterator, packet_size, fileSizeRangeOfSeqNums);
 			sendPacket(clientSocket, packet, SR_window[window_position], packet_size);
 
 			std::cout << std::endl << "Window position: " << window_position << std::endl;
@@ -245,7 +245,7 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 
 			int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
 			char packet[packetArrSize];
-			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], packet_size, fileSizeRangeOfSeqNums);
+			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], iterator, packet_size, fileSizeRangeOfSeqNums);
 			sendPacket(clientSocket, packet, SR_window[window_position], packet_size);
 
 			sent_times[window_position] = std::chrono::system_clock::now();
@@ -255,16 +255,20 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 		//i.e. -> increment window_position along, making sure to never go above window_size
 		window_position = (window_position+1) % window_size;
 
-
-		int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
+		int packetArrSize = (int) (1 + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)? Not for getting acks...
 		char ack[packetArrSize];
 
 		//check for acks
         if(recv(clientSocket, &ack, sizeof(ack), MSG_DONTWAIT) > 0) {
 			//TODO - checksum changes here too
-			std::string ack_str(ack);
-			int ack_sequence_number = std::stoi(ack_str.substr(0, sizeof(int)));
-			bool ack_valid = std::stoi(ack_str.substr(sizeof(int), sizeof(bool)));
+			int ack_sequence_number;
+			bool ack_valid = int(ack[sizeof(int)]);
+
+			//this could be a function (probably unecessary, but it comes up in different files)
+			//get the sequence number of the ack
+			for (int i=0; i < sizeof(int); i++) {
+				ack_sequence_number += ack[i];
+			}
 			
 			//TODO - remove this, *ONLY* process FINAL_SEQUENCE_NUMBER at window shifting, it's easier!
 			if (ack_sequence_number == FINAL_SEQUENCE_NUMBER) {
