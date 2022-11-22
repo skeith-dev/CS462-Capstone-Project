@@ -126,7 +126,7 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
     while(FAILSAFE < 1000000000) {
 		FAILSAFE++;
 
-		int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
+		int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool) + 10); //TODO -> + sizeof(CHECKSUM)
 		char packet[packetArrSize];
 
 		if(recv(serverSocket, &packet, sizeof(packet), MSG_DONTWAIT) > 0) {//TODO - sizeof(packet) could just be packetArrSize?
@@ -137,6 +137,42 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 			int packet_sequence_number = std::stoi(packet_str.substr(0, sizeof(int)));
 			bool packet_valid = std::stoi(packet_str.substr(sizeof(int), sizeof(bool)));
 			//TODO - this is where checksum would be taken out
+			int sum = 0;
+			string binary = "";
+			cout << packetSize << endl;
+			for(int i = 0; i < packetSize; i++){
+				if(i < packetSize){
+					int val = int(a[i]);
+					cout << val << endl;
+					while(val > 0){
+						if(val % 2){
+							binary.push_back('1');
+						} else {
+							binary.push_back('0');
+						}
+						val /= 2;
+					}
+					sum += stoi(binary);
+					cout << sum << endl;
+					binary = "";
+					cout << i << endl;
+				}
+			}
+	
+			string reCheck = "";
+			cout << "we get here?" << endl;
+			for(int j = packetSize; j < packetSize + 6; j++){
+				cout << "a[" << j << "} = " << a[j] << endl;
+				reCheck += a[j];
+			}
+	
+			int check = stoi(reCheck);
+	
+			if(check = sum){
+				cout << "Checksum OK" << endl;
+			} else {
+				cout << "Checksum failed" << endl;
+			}
 			std::string packet_contents = packet_str.substr((int) (sizeof(int) + sizeof(bool)));//this should give the packet contents
 
 			//TODO - REMOVE AFTER TESTING
