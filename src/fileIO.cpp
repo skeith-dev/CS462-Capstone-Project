@@ -38,11 +38,6 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
     std::copy(static_cast<const char*>(static_cast<const void*>(&seqNum)),
               static_cast<const char*>(static_cast<const void*>(&seqNum)) + sizeof(seqNum),
               seqNumBytes);
-    //create char array for valid bool
-    char validBytes[sizeof(bool)];
-    std::copy(static_cast<const char*>(static_cast<const void*>(&seqNum)),
-              static_cast<const char*>(static_cast<const void*>(&seqNum)) + sizeof(seqNum),
-              seqNumBytes);
     //create char array for file contents
     char contentsBytes[packetSize];
     if(seqNum + 1 < fileSizeRangeOfSeqNums) {
@@ -56,11 +51,8 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
     for(int i = 0; i < sizeof(int); i++) {
         packet[i] = seqNumBytes[i];
     }
-    for(int i = 0; i < sizeof(bool); i++) {
-        packet[i + sizeof(int)] = validBytes[i];
-    }
     for(int i = 0; i < packetSize; i++) {
-        packet[i + sizeof(int) + sizeof(bool)] = contentsBytes[i];
+        packet[i + sizeof(int)] = contentsBytes[i];
     }
 
     fileInputStream.close();

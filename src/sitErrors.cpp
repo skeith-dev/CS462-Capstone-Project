@@ -7,14 +7,14 @@
 
 void generateRandomSitErrors(std::vector<int> sitErrorsIterations) {
 
-    srand(time(nullptr));
+    srand(time(nullptr)); // NOLINT(cert-msc51-cpp)
 
     //generate a random number between 1 and 3
-    int numberOfErrors = (rand() % 3) + 1;
+    int numberOfErrors = (rand() % 3) + 1; // NOLINT(cert-msc30-c, cert-msc50-cpp)
 
     //insert a random number between 2 and 10 into the vector
     for(int i = 0; i < numberOfErrors; i++) {
-        sitErrorsIterations.insert(sitErrorsIterations.end(), (rand() % 10) + 2);
+        sitErrorsIterations.insert(sitErrorsIterations.end(), (rand() % 10) + 2); // NOLINT(cert-msc30-c, cert-msc50-cpp)
     }
 
     //remove duplicate elements from the vector
@@ -22,8 +22,8 @@ void generateRandomSitErrors(std::vector<int> sitErrorsIterations) {
     sitErrorsIterations.erase( unique(sitErrorsIterations.begin(), sitErrorsIterations.end() ), sitErrorsIterations.end() );
 
     std::cout << "Every iteration of each of the following packets will be dropped: ";
-    for(int sitErrorIndex : sitErrorsIterations) {
-        std::cout << sitErrorIndex << " ";
+    for(int situationalErrorIndex : sitErrorsIterations) {
+        std::cout << situationalErrorIndex << " ";
     }
     std::cout << std::endl << std::endl;
 
@@ -48,8 +48,8 @@ void generateUserSitErrors(std::vector<int> sitErrorsIterations) {
     }
 
     std::cout << "Every iteration of each of the following packets will be dropped: ";
-    for(int sitErrorIndex : sitErrorsIterations) {
-        std::cout << sitErrorIndex << " ";
+    for(int situationalErrorIndex : sitErrorsIterations) {
+        std::cout << situationalErrorIndex << " ";
     }
     std::cout << std::endl << std::endl;
 
@@ -57,10 +57,10 @@ void generateUserSitErrors(std::vector<int> sitErrorsIterations) {
 
 bool checkIfDropPacket(int sitErrorsIterator, const std::vector<int>& sitErrorsIterations) {
 
-    for(int sitErrorsIteration : sitErrorsIterations) {
+    for(int situationalErrorsIteration : sitErrorsIterations) {
         //sitErrorsIterator must be above 1; if 1 is allowed, then every 1st packet could be dropped (aka, EVERY packet)
-        if(sitErrorsIterator > 1 && sitErrorsIterator % sitErrorsIteration == 0) {
-            std::cout << sitErrorsIterator << " % " << sitErrorsIteration << " = " << 0 << std::endl;
+        if(sitErrorsIterator > 1 && sitErrorsIterator % situationalErrorsIteration == 0) {
+            std::cout << sitErrorsIterator << " % " << situationalErrorsIteration << " = " << 0 << std::endl;
             return true;
         }
     }
