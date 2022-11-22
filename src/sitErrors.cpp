@@ -22,14 +22,14 @@ void generateRandomSitErrors(std::vector<int> sitErrorsIterations) {
     sitErrorsIterations.erase( unique(sitErrorsIterations.begin(), sitErrorsIterations.end() ), sitErrorsIterations.end() );
 
     std::cout << "Every iteration of each of the following packets will be dropped: ";
-    for(int situationalErrorIndex : sitErrorsIterations) {
-        std::cout << situationalErrorIndex << " ";
+    for(int sitErrorIndex : sitErrorsIterations) {
+        std::cout << sitErrorIndex << " ";
     }
     std::cout << std::endl << std::endl;
 
 }
 
-void generateUserSituationalErrors(std::vector<int> sitErrorsIterations) {
+void generateUserSitErrors(std::vector<int> sitErrorsIterations) {
 
     std::string droppedPacketString;
     int droppedPacketCount;
@@ -48,8 +48,8 @@ void generateUserSituationalErrors(std::vector<int> sitErrorsIterations) {
     }
 
     std::cout << "Every iteration of each of the following packets will be dropped: ";
-    for(int situationalErrorIndex : sitErrorsIterations) {
-        std::cout << situationalErrorIndex << " ";
+    for(int sitErrorIndex : sitErrorsIterations) {
+        std::cout << sitErrorIndex << " ";
     }
     std::cout << std::endl << std::endl;
 
@@ -57,10 +57,10 @@ void generateUserSituationalErrors(std::vector<int> sitErrorsIterations) {
 
 bool checkIfDropPacket(int sitErrorsIterator, const std::vector<int>& sitErrorsIterations) {
 
-    for(int situationalErrorsIteration : sitErrorsIterations) {
+    for(int sitErrorsIteration : sitErrorsIterations) {
         //sitErrorsIterator must be above 1; if 1 is allowed, then every 1st packet could be dropped (aka, EVERY packet)
-        if(sitErrorsIterator > 1 && sitErrorsIterator % situationalErrorsIteration == 0) {
-            std::cout << sitErrorsIterator << " % " << situationalErrorsIteration << " = " << 0 << std::endl;
+        if(sitErrorsIterator > 1 && sitErrorsIterator % sitErrorsIteration == 0) {
+            std::cout << sitErrorsIterator << " % " << sitErrorsIteration << " = " << 0 << std::endl;
             return true;
         }
     }
