@@ -7,7 +7,7 @@
 
 void printPacket(char packet[], int packetSize) {
 
-    int length = (int) (sizeof(int) + packetSize);
+    int length = (int) (sizeof(int) + sizeof(bool) + packetSize);
     std::cout << "[ ";
     for(int i = 0; i < length; i++) {
         std::cout << packet[i];
@@ -18,7 +18,8 @@ void printPacket(char packet[], int packetSize) {
 
 void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize) {
 
-    int length = (int) (sizeof(int) + packetSize);
+	//TODO - this will have to change when checksum is implemented (to include it in the header)
+    int length = (int) (sizeof(int) + sizeof(bool) + packetSize);
     ssize_t result = send(clientSocket, packet, length, 0);
 
     if(result != -1) {

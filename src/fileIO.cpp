@@ -24,7 +24,7 @@ int openFile(const std::string& filePath) {
 
 }
 
-void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int seqNum, int packetSize, int fileSizeRangeOfSeqNums) {
+void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int seqNum, int iterator, int packetSize, int fileSizeRangeOfSeqNums) {
 
     //create ifstream object
     std::ifstream fileInputStream;
@@ -38,12 +38,25 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
     std::copy(static_cast<const char*>(static_cast<const void*>(&seqNum)),
               static_cast<const char*>(static_cast<const void*>(&seqNum)) + sizeof(seqNum),
               seqNumBytes);
+    //create char array for valid bool
+	bool isValid = true;
+    char validBytes[sizeof(bool)];
+    std::copy(static_cast<const char*>(static_cast<const void*>(&isValid)),
+              static_cast<const char*>(static_cast<const void*>(&isValid)) + sizeof(isValid),
+              validBytes);
     //create char array for file contents
     char contentsBytes[packetSize];
-    if(seqNum + 1 < fileSizeRangeOfSeqNums) {
+
+	//TODO -> https://www.learncpp.com/cpp-tutorial/chars/ > ASCII character array for CPP
+	// Send EOT as last char, append onto the final packet. When that is received, check for each char==int(4). If true, EOT
+	// EOT is end of transmission character, it's perfect for what we need...
+	// Also, 6 is ack...? huh...
+	// just have the last char be >>>   char eot = 4;
+
+    if(iterator + 1 < fileSizeRangeOfSeqNums) {
         fileInputStream.read(contentsBytes, packetSize);
     } else {
-        int remainingBytes = fileSize - (seqNum * packetSize);
+        int remainingBytes = fileSize - (iterator * packetSize);
         std::cout << "REMAINING BYTES: " << remainingBytes << std::endl;
         fileInputStream.read(contentsBytes, remainingBytes);
     }
@@ -51,10 +64,38 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
     for(int i = 0; i < sizeof(int); i++) {
         packet[i] = seqNumBytes[i];
     }
+    for(int i = 0; i < sizeof(bool); i++) {
+        packet[i + sizeof(int)] = validBytes[i];
+    }
     for(int i = 0; i < packetSize; i++) {
-        packet[i + sizeof(int)] = contentsBytes[i];
+        packet[i + sizeof(int) + sizeof(bool)] = contentsBytes[i];
     }
 
     fileInputStream.close();
 
 }
+
+//TODO - implement char = 4; (EOT) for the input to this function
+void writePacketToFile(bool append, const std::string& message, const std::string& filePath) {
+
+    std::ofstream fileOutputStream;
+    if(append) {
+        fileOutputStream.open(filePath, std::ios_base::app);
+    } else {
+        fileOutputStream.open(filePath);
+    }
+    fileOutputStream << message;
+
+    fileOutputStream.close();
+
+}
+
+
+
+
+
+
+/* INFO */
+
+//Each packet contains:
+//[int=seqNum, 4 bytes], [bool=valid, 1 byte], [char*=contents, packetSize bytes]

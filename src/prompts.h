@@ -5,8 +5,8 @@
 #ifndef UWEC_CS462_CAPSTONE_PROJECT_PROMPTS_H
 #define UWEC_CS462_CAPSTONE_PROJECT_PROMPTS_H
 
-#import <iostream>
-#import <string>
+#include <iostream>
+#include <string>
 
 
 std::string userStringPrompt(const std::string& prompt);

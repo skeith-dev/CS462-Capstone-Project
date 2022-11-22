@@ -27,4 +27,6 @@ int openFile(const std::string& filePath);
  */
 void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int seqNum, int packetSize, int fileSizeRangeOfSeqNums);
 
+void writePacketToFile(bool append, const std::string& message, const std::string& filePath);
+
 #endif //UWEC_CS462_CAPSTONE_PROJECT_FILEIO_H
