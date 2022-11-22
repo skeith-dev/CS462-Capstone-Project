@@ -3,7 +3,8 @@
 //
 
 #include "fileIO.h"
-
+#include <bits/stdc++.h>
+using namespace std;
 
 int openFile(const std::string& filePath) {
 
@@ -67,6 +68,37 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
     for(int i = 0; i < sizeof(bool); i++) {
         packet[i + sizeof(int)] = validBytes[i];
     }
+	int counter = sizeof(int);
+	string binary = "";
+	int sum = 0;
+	for(int i = 0; i < sizeof(int); i++){
+		int val = int(packet[i]);
+		cout << val << endl;
+		while(val > 0){
+			if(val % 2){
+				binary.push_back('1');
+				packet[counter] = '1';
+				counter += 1;
+			} else {
+				binary.push_back('0');
+				packet[counter] = '0';
+				counter += 1;
+			}
+			val /= 2;
+		}
+		cout << binary << endl;
+		sum += stoi(binary);
+		cout << sum << endl;
+		binary = "";
+		cout << binary << endl;
+	}
+	
+	int j = sizeof(int);
+	while(sum > 0){
+		packet[j] = sum % 10;
+		sum /= 10;
+		j++;
+	}
     for(int i = 0; i < packetSize; i++) {
         packet[i + sizeof(int) + sizeof(bool)] = contentsBytes[i];
     }
