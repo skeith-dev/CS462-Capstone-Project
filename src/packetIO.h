@@ -42,4 +42,11 @@ void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize);
  */
 void sendAck(int clientSocket, char ack[], int seqNum);
 
+/**
+ * Prints the sliding window
+ * @param slidingWindow The sliding window which is being printed
+ * @param slidingWindowSize The size of the sliding window
+ */
+void printWindow(int slidingWindow[], int slidingWindowSize);
+
 #endif //UWEC_CS462_CAPSTONE_PROJECT_PACKETIO_H

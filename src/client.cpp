@@ -18,8 +18,6 @@
 
 void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int fileSize, int numOfPackets, int packetSize, int timeoutInterval, const std::vector<int>& sitErrorsIterations);
 
-//void selectiveRepeatProtocol();
-
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
 //Function implementations (including main)      //*****//*****//*****//
 
@@ -88,7 +86,6 @@ int main() {
                 break;
             case 1:
                 std::cout << std::endl << "Executing Selective Repeat protocol..." << std::endl << std::endl;
-                //executeSRProtocol();
                 break;
             default:
                 break;
@@ -106,24 +103,19 @@ int main() {
 
 void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int fileSize, int numOfPackets, int packetSize, int timeoutInterval, const std::vector<int>& sitErrorsIterations) {
 
-    for(int sitErrorsIteration : sitErrorsIterations) {
-        std::cout << sitErrorsIteration;
-    }
-    std::cout << std::endl;
-
     std::chrono::system_clock::time_point startTime;
     std::chrono::system_clock::time_point endTime;
 
     std::chrono::system_clock::time_point timerStart;
-
-
-    startTime = std::chrono::system_clock::now();
 
     char packet[ sizeof(int) + packetSize ];
     char ack[ sizeof(int) ];
     bool outstanding = false;
     int iterator = 0;
     int sitErrorsIterator = 0;
+
+    startTime = std::chrono::system_clock::now();
+
     while(true) {
 
         if(iterator > numOfPackets - 1) {

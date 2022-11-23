@@ -9,15 +9,13 @@
 #include "fileIO.h"
 #include "packetIO.h"
 
-#define FINAL_SEQUENCE_NUMBER -1
+#define FINAL_SEQUENCE_NUMBER (-1)
 
 
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
 //Function declarations                          //*****//*****//*****//
 
 void stopAndWaitProtocol(int clientSocket, int packetSize, const std::string& filePath);
-
-void selectiveRepeatProtocol();
 
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
 //Function implementations (including main)      //*****//*****//*****//

@@ -26,29 +26,29 @@ int openFile(const std::string& filePath) {
 
 }
 
-void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int seqNum, int packetSize, int fileSizeRangeOfSeqNums) {
+void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int index, int packetSize, int numOfPackets) {
 
     //create ifstream object
     std::ifstream fileInputStream;
     //open file at filepath in read and binary modes
     fileInputStream.open(filePath, std::ios_base::in | std::ios_base::binary);
     //navigate to section of file beginning at (seqNum * packetSize) offset from beginning
-    fileInputStream.seekg(seqNum * packetSize, std::ios_base::beg);
+    fileInputStream.seekg(index * packetSize, std::ios_base::beg);
 
     //create char array for seqNum int
     char seqNumBytes[sizeof(int)];
-    std::copy(static_cast<const char*>(static_cast<const void*>(&seqNum)),
-              static_cast<const char*>(static_cast<const void*>(&seqNum)) + sizeof(seqNum),
+    std::copy(static_cast<const char*>(static_cast<const void*>(&index)),
+              static_cast<const char*>(static_cast<const void*>(&index)) + sizeof(index),
               seqNumBytes);
     //create char array for file contents
     char contentsBytes[packetSize];
     for(int i = 0; i < packetSize; i++) {
         contentsBytes[i] = '\0';
     }
-    if(seqNum < fileSizeRangeOfSeqNums) {
+    if(index < numOfPackets) {
         fileInputStream.read(contentsBytes, packetSize);
     } else {
-        int remainingBytes = fileSize - (seqNum * packetSize);
+        int remainingBytes = fileSize - (index * packetSize);
         std::cout << "REMAINING BYTES: " << remainingBytes << std::endl;
         fileInputStream.read(contentsBytes, remainingBytes);
     }

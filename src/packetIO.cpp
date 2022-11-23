@@ -53,3 +53,13 @@ void sendAck(int clientSocket, char ack[], int seqNum) {
     }
 
 }
+
+void printWindow(int slidingWindow[], int slidingWindowSize) {
+
+    std::cout << "Sliding Window: [ ";
+    for(int i = 0; i < slidingWindowSize; i++) {
+        std::cout << slidingWindow[i];
+    }
+    std::cout << " ]" << std::endl;
+
+}
