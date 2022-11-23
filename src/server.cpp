@@ -21,7 +21,7 @@ void stopAndWaitProtocol();
 void selectiveRepeatProtocol(int serverSocket, int clientSize);
 
 
-int packet_size, slidingWindowSize;
+int packet_size, slidingWindowSize, sequence_range;
 std::string filePath;
 
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
@@ -52,7 +52,7 @@ int main() {
 
         //prompt user for each of the following fields
         //port number of the target server
-        int portNum = 9090;//userIntPrompt("What is the port number of the target server:", 0, 9999);
+        int portNum = 9091;//userIntPrompt("What is the port number of the target server:", 0, 9999);
         serverAddress.sin_port = htons(portNum);
         if (bind(serverSocket, (sockaddr*) &serverAddress, sizeof(serverAddress)) == -1) {
             perror("Failed to bind socket to port (bind)!");
@@ -62,9 +62,12 @@ int main() {
         int protocolType = 1;//userIntPrompt("Type of protocol, S&W (0) or SR (1):", 0, 1);
         //specified size of packets to be sent
         packet_size = 30;//userIntPrompt("Size of packets (must be same as sender):", 1, INT_MAX);
-        //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
+
+		//TODO - he says not infinite, but the max could really be anything
+		sequence_range = 8;//userIntPrompt("Sequence range: ", 2, 5000);
+
         if(protocolType > 0) {
-            slidingWindowSize = 10;//userIntPrompt("Size of sliding window:", 1, MAX_INPUT);
+            slidingWindowSize = 2;//userIntPrompt("Size of sliding window:", 1, sequence_range/2);
         }
         //path of file to be sent
         filePath = "output.txt";//userStringPrompt("What is the filepath of the file you wish to write TO:");
@@ -121,7 +124,7 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 	for (int i = 0; i < slidingWindowSize; i++)
 		SR_window[i] = i;
 
-	int last_packet_num = SR_window[-1];
+	int last_packet_num = SR_window[slidingWindowSize-1];
 	
     while(FAILSAFE < 1000000000) {
 		FAILSAFE++;
@@ -154,9 +157,9 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 				break;
 			}
 			//TODO - this doesn't work with sequence range logic, fix this. What if packet_sequence_number==0, and window[0]==13?
-			if(packet_sequence_number < SR_window[0]) {
+			if(packet_sequence_number < SR_window[0] && packet_sequence_number > SR_window[slidingWindowSize-1]) {
 				std::cout << "Packet " << packet_sequence_number << " lost the ack, resend" << std::endl;
-
+				
 				//TODO - this should be a sendAck function. Add this to packetIO.cpp
 				int ack_packet_size = (int) (sizeof(int) + sizeof(bool) + 1);
 				char ack_packet[ack_packet_size];
@@ -188,7 +191,9 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 			}
 
             std::cout << "Packet " << packet_sequence_number << " recieved" << std::endl;
-						
+
+			//TODO - if checksum fails, continue;
+
 			//find the index of the received packet, and send the ack
 			for (int i = 0; i < slidingWindowSize; i++) {
 				if (SR_window[i] == packet_sequence_number) {
@@ -222,6 +227,7 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 					//TODO - reimplement this -> sendAck(serverSocket, packet_sequence_number);
 					received_packet_contents[i] = packet_contents;
 					iterator++;
+					last_packet_num = SR_window[i];
 					SR_window[i] = -2;
 					break;
 				}
@@ -242,8 +248,15 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 					//If -2, it was received
 					if (SR_window[slidingWindowSize-1] == -2) {
 						SR_window[slidingWindowSize-1] = SR_window[slidingWindowSize-1]+1;
+					} else {
+						SR_window[slidingWindowSize-1] = SR_window[slidingWindowSize-2]+1;
 					}
-					received_packet_contents[slidingWindowSize-1] = 'NULL';
+					
+					if (SR_window[slidingWindowSize-1] >= sequence_range) {
+						SR_window[slidingWindowSize-1] = 0;
+					}
+					
+					received_packet_contents[slidingWindowSize-1] = '0';
 				}
 				//print the window
 				std::cout << "receiver window: [";
@@ -257,7 +270,7 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 
     }
 	
-	std::cout << "Last packet seq# received: " << iterator - 1 << std::endl;
+	std::cout << "Last packet seq# received: " << last_packet_num << std::endl;
 	//std::cout << ":" << std::endl << "Successfully received file." << std::endl;
 	close(serverSocket);
 

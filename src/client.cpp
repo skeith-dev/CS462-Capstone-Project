@@ -68,7 +68,7 @@ int main() {
 
         //prompt user for each of the following fields
         //port number of the target server
-        int portNum = 9090;//userIntPrompt("What is the port number of the target server:", 0, 9999);
+        int portNum = 9091;//userIntPrompt("What is the port number of the target server:", 0, 9999);
         serverAddress.sin_port = htons(portNum);
 //TODO        std::cout << std::endl << "Connecting to server..." << std::endl << std::endl;
 //        if (connect(clientSocket, (struct sockaddr*) &serverAddress, sizeof(serverAddress)) < 0) {
@@ -89,10 +89,10 @@ int main() {
         //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
 
 		//TODO - he says not infinite, but the max could really be anything
-		sequence_range = 100;//userIntPrompt("Sequence range: ", 2, 5000);
+		sequence_range = 8;//userIntPrompt("Sequence range: ", 2, 5000);
 
         if(protocolType > 0) {
-            window_size = 10;//userIntPrompt("Size of sliding window:", 1, sequence_range/2);
+            window_size = 2;//userIntPrompt("Size of sliding window:", 1, sequence_range/2);
         }
         //none (0), randomly generated (1), or user-specified (2)
         int situationalErrors = 0;//userIntPrompt("Situational errors; none (0), randomly generated (1), or user-specified (2):", 0, 2);
@@ -136,7 +136,7 @@ int main() {
             default:
                 break;
         }
-
+		std::cout << std::endl;
         quit = userBoolPrompt("Would you like to exit (1), or perform another file transfer (0):");
     } while (!quit);
 
@@ -151,6 +151,7 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 
 	//iterator to count the number of packets sent
     int iterator = 0;
+    int cycles_completed = 1;
     int window_position = 0;
 	int client_fd;
 
@@ -200,10 +201,11 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 			//the packet hasn't been sent yet, send it
 			int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
 			char packet[packetArrSize];
-			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], iterator, packet_size, fileSizeRangeOfSeqNums);
+			int offset = sequence_range * cycles_completed - sequence_range;
+			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], offset, iterator, packet_size, fileSizeRangeOfSeqNums);
 			//TODO - sendPacket should return the number of bytes sent for calculations. Add to sent_data double.
 			sendPacket(clientSocket, packet, SR_window[window_position], packet_size);
-
+			
 			status[window_position] = 1;
 			sent_times[window_position] = std::chrono::system_clock::now();
 			
@@ -213,7 +215,8 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 
 			int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
 			char packet[packetArrSize];
-			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], iterator, packet_size, fileSizeRangeOfSeqNums);
+			int offset = sequence_range * cycles_completed - sequence_range;
+			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], offset, iterator, packet_size, fileSizeRangeOfSeqNums);
 			sendPacket(clientSocket, packet, SR_window[window_position], packet_size);
 
 			sent_times[window_position] = std::chrono::system_clock::now();
@@ -245,7 +248,7 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 				continue;
 			}
 			//if the ack is outside the window, something is wrong... Skip this iteration
-			if(ack_sequence_number < SR_window[0]) {//TODO - true SR, add ->  || ack_sequence_number > SR_window[window_size-1]
+			if(ack_sequence_number < SR_window[0] && ack_sequence_number > SR_window[window_size-1]) {
 				continue;
 			}
             std::cout << "Received ack #" << ack_sequence_number << std::endl;
@@ -270,13 +273,6 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 
 					}
 					
-					//TODO - delete this printing stuff
-					std::cout << "Status window:";
-					for(int i=0; i<window_size; i++){
-						std::cout << status[i] << ", ";
-					}
-					std::cout << std::endl;
-
 					if (status[window_size-1] == FINAL_SEQUENCE_NUMBER) {						
 						status[window_size-1] = FINAL_SEQUENCE_NUMBER;
 					} else {
@@ -285,8 +281,10 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 					SR_window[window_size-1] = SR_window[window_size-1]+1;
 
 					if (SR_window[window_size-1] >= sequence_range) {
-						SR_window[window_size-1] == 0;
+						SR_window[window_size-1] = 0;
+						cycles_completed++;
 					}
+
 					window_position = window_position-1;
 					if (window_position < 0) window_position = window_size-1;
 				}
@@ -300,11 +298,11 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 			
 			//if all packets sent, break
 			if (iterator == fileSizeRangeOfSeqNums) {
-				std::cout << "done" << std::endl;
+				//std::cout << "done" << std::endl;
 
 				int packetArrSize = (int) (packet_size + sizeof(int) + sizeof(bool)); //TODO -> + sizeof(CHECKSUM)
 				char packet[packetArrSize];
-				writeFileToPacket(packet, filePath, fileSize, FINAL_SEQUENCE_NUMBER, iterator, packet_size, fileSizeRangeOfSeqNums);
+				writeFileToPacket(packet, filePath, fileSize, FINAL_SEQUENCE_NUMBER, (window_size*(cycles_completed-1)), iterator, packet_size, fileSizeRangeOfSeqNums);
 				sendPacket(clientSocket, packet, FINAL_SEQUENCE_NUMBER, packet_size);
 
 				break;
