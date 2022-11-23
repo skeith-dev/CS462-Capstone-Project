@@ -32,7 +32,7 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
     std::ifstream fileInputStream;
     //open file at filepath in read and binary modes
     fileInputStream.open(filePath, std::ios_base::in | std::ios_base::binary);
-    //navigate to section of file beginning at (seqNum * packetSize) offset from beginning
+    //navigate to section of file beginning at (index * packetSize) offset from beginning
     fileInputStream.seekg(index * packetSize, std::ios_base::beg);
 
     //create char array for seqNum int
