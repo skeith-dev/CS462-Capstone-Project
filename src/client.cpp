@@ -10,13 +10,13 @@
 #include "packetIO.h"
 #include "sitErrors.h"
 
-#define FINAL_SEQUENCE_NUMBER -1
+#define FINAL_SEQUENCE_NUMBER (-1)
 
 
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
 //Function declarations                          //*****//*****//*****//
 
-void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int fileSize, int numOfPackets, int packetSize, int timeoutInterval, const std::vector<int>& sitErrorsIterations);
+void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int fileSize, int numOfPackets, int packetSize, float timeoutInterval, const std::vector<int>& sitErrorsIterations);
 
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
 //Function implementations (including main)      //*****//*****//*****//
@@ -49,7 +49,7 @@ int main() {
         //specified size of packets to be sent
         int packetSize = userIntPrompt("Size of packets:", 1, INT_MAX);
         //user-specified (0+) or default (-1)
-        int timeoutInterval = userIntPrompt("Timeout interval, user-specified or ping calculated (-1):", -1, INT_MAX);
+        float timeoutInterval = userFloatPrompt("Timeout interval, user-specified or ping calculated (-1):", -1, INT_MAX);
         //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
         int slidingWindowSize;
         //ex. (sliding window size = 3) [1, 2, 3] -> [2, 3, 4] -> [3, 4, 5], range = 5
@@ -101,7 +101,7 @@ int main() {
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
 //Network protocols (algorithms)
 
-void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int fileSize, int numOfPackets, int packetSize, int timeoutInterval, const std::vector<int>& sitErrorsIterations) {
+void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int fileSize, int numOfPackets, int packetSize, float timeoutInterval, const std::vector<int>& sitErrorsIterations) {
 
     std::chrono::system_clock::time_point startTime;
     std::chrono::system_clock::time_point endTime;

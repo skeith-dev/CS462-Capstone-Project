@@ -29,18 +29,18 @@ void printAck(char ack[]);
  * @param clientSocket The client socket, which sends the packet to the server
  * @param serverAddress The address of the server, which receives the packet from the client socket
  * @param packet The char array being sent from client to server; contains seqNum, valid, and contents
- * @param seqNum The sequence number of the packet being sent to the server
+ * @param iterator The number of the packet being sent to the server
  * @param packetSize The size of the packet CONTENTS; does NOT include seqNum and valid bytes
  */
-void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize);
+void sendPacket(int clientSocket, char packet[], int iterator, int packetSize);
 
 /**
  * Sends char array ack to client
  * @param clientSocket The client socket, which the ack is being sent to
  * @param ack The char array being sent from server to client
- * @param seqNum The sequence number of the packet received from the client
+ * @param iterator The number of the packet received from the client
  */
-void sendAck(int clientSocket, char ack[], int seqNum);
+void sendAck(int clientSocket, char ack[], int iterator);
 
 /**
  * Prints the sliding window

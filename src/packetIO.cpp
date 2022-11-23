@@ -26,30 +26,30 @@ void printAck(char ack[]) {
 
 }
 
-void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize) {
+void sendPacket(int clientSocket, char packet[], int iterator, int packetSize) {
 
     int length = (int) (sizeof(int) + packetSize);
     ssize_t result = send(clientSocket, packet, length, 0);
 
     if(result != -1) {
-        std::cout << "Sent Packet #" << seqNum << ": ";
+        std::cout << "Sent Packet #" << iterator << ": ";
         printPacket(packet, packetSize);
     } else {
-        std::cout << "Failed to send Packet #" << seqNum << "!" << std::endl;
+        std::cout << "Failed to send Packet #" << iterator << "!" << std::endl;
     }
 
 }
 
-void sendAck(int clientSocket, char ack[], int seqNum) {
+void sendAck(int clientSocket, char ack[], int iterator) {
 
     int length = sizeof(int);
     ssize_t result = send(clientSocket, ack, length, 0);
 
     if(result != -1) {
-        std::cout << "Send Ack #" << seqNum << ": ";
+        std::cout << "Send Ack #" << iterator << ": ";
         printAck(ack);
     } else {
-        std::cout << "Failed to send Ack #" << seqNum << "!" << std::endl;
+        std::cout << "Failed to send Ack #" << iterator << "!" << std::endl;
     }
 
 }

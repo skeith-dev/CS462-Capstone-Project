@@ -4,7 +4,7 @@
 
 #include "fileIO.h"
 
-#define FINAL_SEQUENCE_NUMBER -1
+#define FINAL_SEQUENCE_NUMBER (-1)
 
 
 int openFile(const std::string& filePath) {
@@ -26,29 +26,29 @@ int openFile(const std::string& filePath) {
 
 }
 
-void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int index, int packetSize, int numOfPackets) {
+void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int iterator, int packetSize, int numOfPackets) {
 
     //create ifstream object
     std::ifstream fileInputStream;
     //open file at filepath in read and binary modes
     fileInputStream.open(filePath, std::ios_base::in | std::ios_base::binary);
-    //navigate to section of file beginning at (index * packetSize) offset from beginning
-    fileInputStream.seekg(index * packetSize, std::ios_base::beg);
+    //navigate to section of file beginning at (iterator * packetSize) offset from beginning
+    fileInputStream.seekg(iterator * packetSize, std::ios_base::beg);
 
     //create char array for seqNum int
     char seqNumBytes[sizeof(int)];
-    std::copy(static_cast<const char*>(static_cast<const void*>(&index)),
-              static_cast<const char*>(static_cast<const void*>(&index)) + sizeof(index),
+    std::copy(static_cast<const char*>(static_cast<const void*>(&iterator)),
+              static_cast<const char*>(static_cast<const void*>(&iterator)) + sizeof(iterator),
               seqNumBytes);
     //create char array for file contents
     char contentsBytes[packetSize];
     for(int i = 0; i < packetSize; i++) {
         contentsBytes[i] = '\0';
     }
-    if(index < numOfPackets) {
+    if(iterator < numOfPackets) {
         fileInputStream.read(contentsBytes, packetSize);
     } else {
-        int remainingBytes = fileSize - (index * packetSize);
+        int remainingBytes = fileSize - (iterator * packetSize);
         std::cout << "REMAINING BYTES: " << remainingBytes << std::endl;
         fileInputStream.read(contentsBytes, remainingBytes);
     }
