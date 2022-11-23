@@ -10,7 +10,7 @@
 #include "packetIO.cpp"
 #include <bits/stdc++.h>
 
-#define FINAL_SEQUENCE_NUMBER -1
+#define FINAL_SEQUENCE_NUMBER (-1)
 
 
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
@@ -52,25 +52,26 @@ int main() {
 
         //prompt user for each of the following fields
         //port number of the target server
-        int portNum = 9091;//userIntPrompt("What is the port number of the target server:", 0, 9999);
+        int portNum = userIntPrompt("What is the port number of the target server:", 0, 9999);
         serverAddress.sin_port = htons(portNum);
         if (bind(serverSocket, (sockaddr*) &serverAddress, sizeof(serverAddress)) == -1) {
             perror("Failed to bind socket to port (bind)!");
             exit(EXIT_FAILURE);
         }
         //0 for S&W, 1 for SR
-        int protocolType = userIntPrompt("Type of protocol, S&W (0) or SR (1):", 0, 1);
+		//INCOMPLETE
+        int protocolType = 1;//userIntPrompt("Type of protocol, S&W (0) or SR (1):", 0, 1);
         //specified size of packets to be sent
-        packet_size = 30;//userIntPrompt("Size of packets (must be same as sender):", 1, 30000);//INT_MAX, but 30000 avoids segfault?
+        packet_size = userIntPrompt("Size of packets (must be same as sender):", 1, 30000);//INT_MAX, but 30000 avoids segfault?
 
 		//Only selective repeat uses sequence_range and windows
         if(protocolType > 0) {
 			//TODO - SEE client.cpp
-			sequence_range = 80;//userIntPrompt("Sequence range: ", 2, 1000);
-            slidingWindowSize = 20;//userIntPrompt("Size of sliding window:", 1, sequence_range/2);
+			sequence_range = userIntPrompt("Sequence range: ", 2, 1000);
+            slidingWindowSize = userIntPrompt("Size of sliding window:", 1, sequence_range/2);
         }
         //path of file to be sent
-        filePath = "output.txt";//userStringPrompt("What is the filepath of the file you wish to write TO:");
+        filePath = userStringPrompt("What is the filepath of the file you wish to write TO:");
 
         //listen for client connection
         std::cout << std::endl << "Listening for client connection..." << std::endl;
@@ -101,7 +102,7 @@ int main() {
                 break;
         }
 
-        quit = userBoolPrompt("Would you like to exit (1), or perform another file transfer (0):");
+        quit = true;//userBoolPrompt("Would you like to exit (1), or perform another file transfer (0):");
     } while(!quit);
 
 	//TODO - do we have to close sockets? I don't know
@@ -189,7 +190,7 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 			} else {//TODO - this is a rudimentary solution for the end of sequence
 				for (int i=0; i < sizeof(int); i++) {
 					packet_sequence_number += packet[i];
-				}				
+				}
 			}
 			int length = (int) (sizeof(int) + sizeof(bool) + packet_size);
 			for(int i = sizeof(int)+1; i < length; i++) {
@@ -260,6 +261,7 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 
     }
 	
+	std::cout << ":" << std::endl << ":" << std::endl << std::endl;
 	std::cout << "Last packet seq# received: " << last_packet_num << std::endl;
 	//std::cout << ":" << std::endl << "Successfully received file." << std::endl;
 	close(serverSocket);

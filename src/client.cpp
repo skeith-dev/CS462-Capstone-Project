@@ -29,8 +29,8 @@
 
 void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int fileSize, int numOfPackets, int packetSize, float timeoutInterval, const std::vector<int>& sitErrorsIterations);
 
-void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address);
-int packet_size, timeout_interval, window_size, sequence_range, port_num, fileSize, fileSizeRangeOfSeqNums, slidingWindowSize;
+void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address, const std::vector<int>& sitErrorsIterations);
+int packet_size, window_size, sequence_range, port_num, fileSize, fileSizeRangeOfSeqNums, slidingWindowSize, timeout_interval;
 std::string filePath;
 
 //*****//*****//*****//*****//*****//*****//*****//*****//*****//*****//
@@ -52,25 +52,24 @@ int main() {
 
         //prompt user for each of the following fields
         //port number of the target server
-        int portNum = 9091;//userIntPrompt("What is the port number of the target server:", 0, 9999);
+        int portNum = userIntPrompt("What is the port number of the target server:", 0, 9999);
         serverAddress.sin_port = htons(portNum);
 
         //0 for S&W, 1 for SR
-        int protocolType = userIntPrompt("Type of protocol, S&W (0) or SR (1):", 0, 1);
+        int protocolType = 1;//userIntPrompt("Type of protocol, S&W (0) or SR (1):", 0, 1);
 
         //specified size of packets to be sent
 		//relates only to the contents, not the header. More bytes will be sent than this
-        packet_size = 30;//userIntPrompt("Size of packets:", 1, INT_MAX);
+        packet_size = userIntPrompt("Size of packets:", 1, INT_MAX);
 
         //user-specified (0+) or default (-1)
-        timeout_interval = 9999;//userIntPrompt("Timeout interval, user-specified or ping calculated (-1) (measured in ms):", -1, INT_MAX);
-        //ex. [1, 2, 3, 4, 5, 6, 7, 8], size = 8
+        timeout_interval = userIntPrompt("Timeout interval, user-specified (measured in ms):", 0, INT_MAX);
 
         if(protocolType > 0) {
 			//TODO - he says not infinite, but the max could really be anything
 			//TODO - if sequenceNum calculations change, this can be higher than 1015(ish), but 1000 isn't bad
-			sequence_range = 80;//userIntPrompt("Sequence range: ", 2, 1000);
-            window_size = 20;//userIntPrompt("Size of sliding window:", 1, sequence_range/2);
+			sequence_range = userIntPrompt("Sequence range: ", 2, 1000);
+            window_size = userIntPrompt("Size of sliding window:", 1, sequence_range/2);
         } else {
 			//TODO - I removed this, but S&W needs it here. Does this work?
 			std::cout << std::endl << "Connecting to server..." << std::endl << std::endl;
@@ -115,13 +114,13 @@ int main() {
                 break;
             case 1:
                 std::cout << std::endl << "Executing Selective Repeat protocol..." << std::endl << std::endl;
-                selectiveRepeatProtocol(clientSocket, serverAddress);//TODO - sit errors param ", sitErrorsIterations"
+                selectiveRepeatProtocol(clientSocket, serverAddress, sitErrorsIterations);//TODO - sit errors param ", sitErrorsIterations"
                 break;
             default:
                 break;
         }
 		std::cout << std::endl;
-        quit = userBoolPrompt("Would you like to exit (1), or perform another file transfer (0):");
+        quit = true;//userBoolPrompt("Would you like to exit (1), or perform another file transfer (0):");
     } while (!quit);
 
     return 0;
@@ -204,7 +203,7 @@ void stopAndWaitProtocol(int clientSocket, const std::string& filePath, int file
 /*
  * selectiveRepeatProtocol implements the actual selective repeat protocol
  */
-void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
+void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address, const std::vector<int>& sitErrorsIterations) {
 
 	//iterator to count the number of packets sent
     int iterator = 0;
@@ -242,6 +241,7 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 	
 	double sent_data = 0;
 	double num_retransmitted = 0;
+	int sitErrorsIterator = 0;
 	
 	std::cout << std::endl << std::endl;
 
@@ -257,7 +257,13 @@ void selectiveRepeatProtocol(int clientSocket, sockaddr_in server_address) {
 			char packet[packetArrSize];
 			int offset = sequence_range * cycles_completed - sequence_range;
 			writeFileToPacket(packet, filePath, fileSize, SR_window[window_position], offset, iterator, packet_size, fileSizeRangeOfSeqNums);
-			sent_data += sendPacket(clientSocket, packet, SR_window[window_position], packet_size);
+
+            if(!checkIfDropPacket(sitErrorsIterator, sitErrorsIterations)) {
+				sent_data += sendPacket(clientSocket, packet, SR_window[window_position], packet_size);
+			} else {
+                std::cout << "Dropping Packet #" << SR_window[window_position] << std::endl;
+            }
+			sitErrorsIterator++;
 			
 			status[window_position] = 1;
 			sent_times[window_position] = std::chrono::system_clock::now();

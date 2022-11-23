@@ -82,11 +82,13 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
 		}
 		
 		//TODO
+		/*
 		std::cout << "Bytes became: " << std::endl;
 		for (int i=0; i<packetSize; i++) {
 			std::cout << contentsBytes[i] << ", int=" << int(contentsBytes[i]) << std::endl;
 		}
 		exit(0);
+		*/
 		
     }
     //construct char array "packet"
