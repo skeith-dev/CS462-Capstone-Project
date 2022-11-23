@@ -16,7 +16,7 @@ void printPacket(char packet[], int packetSize) {
 
 }
 
-void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize) {
+int sendPacket(int clientSocket, char packet[], int seqNum, int packetSize) {
 
 	//TODO - this will have to change when checksum is implemented (to include it in the header)
     int length = (int) (sizeof(int) + sizeof(bool) + packetSize);
@@ -30,10 +30,35 @@ void sendPacket(int clientSocket, char packet[], int seqNum, int packetSize) {
     } else {
         std::cout << "Failed to send Packet #" << seqNum << "!" << std::endl;
     }
+	return result;
 
 }
 
-void sendAck(int clientSocket, char ack[], int seqNum) {//ACK SIZE == 1 for now
+void sendAck(int clientSocket, int seqNum) {//ACK SIZE == 1 for now
+
+	int ack_packet_size = (int) (sizeof(int) + sizeof(bool) + 1);
+	char ack[ack_packet_size];
+	ack[sizeof(int)+sizeof(bool)+1] = 6;//ACK value (for fun?)
+
+	char packet_sequence_number_bytes[sizeof(int)];					
+	int temp_seq_num = seqNum;
+	
+	for (int i=sizeof(int)-1; i >= 0; i--) {
+		if(temp_seq_num - 127 > 0) {
+			packet_sequence_number_bytes[i] = 127;
+			temp_seq_num = temp_seq_num - 127;
+		} else if (temp_seq_num - 127 < 0){
+			packet_sequence_number_bytes[i] = temp_seq_num;
+			temp_seq_num = 0;
+		} else {
+			packet_sequence_number_bytes[i] = 0;
+		}
+	}
+
+	//write seqNum to ack
+	for(int i=0; i<sizeof(int); i++) {
+		ack[i] = packet_sequence_number_bytes[i];
+	}
 
 	//TODO - this will have to change when checksum is implemented (to include it in the header)
     int length = (int) (sizeof(int) + sizeof(bool) + 1);

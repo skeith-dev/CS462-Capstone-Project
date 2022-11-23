@@ -61,13 +61,13 @@ int main() {
         //0 for S&W, 1 for SR
         int protocolType = 1;//userIntPrompt("Type of protocol, S&W (0) or SR (1):", 0, 1);
         //specified size of packets to be sent
-        packet_size = 30;//userIntPrompt("Size of packets (must be same as sender):", 1, INT_MAX);
+        packet_size = 30;//userIntPrompt("Size of packets (must be same as sender):", 1, 30000);//INT_MAX, but 30000 avoids segfault?
 
-		//TODO - he says not infinite, but the max could really be anything
-		sequence_range = 8;//userIntPrompt("Sequence range: ", 2, 5000);
+		//TODO - SEE client.cpp
+		sequence_range = 80;//userIntPrompt("Sequence range: ", 2, 1000);
 
         if(protocolType > 0) {
-            slidingWindowSize = 2;//userIntPrompt("Size of sliding window:", 1, sequence_range/2);
+            slidingWindowSize = 20;//userIntPrompt("Size of sliding window:", 1, sequence_range/2);
         }
         //path of file to be sent
         filePath = "output.txt";//userStringPrompt("What is the filepath of the file you wish to write TO:");
@@ -152,79 +152,26 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 				packet_contents = packet_contents + packet[i];
 			}
 
-			//TODO - remove FINAL_SEQUENCE_NUMBER
+			//TODO - can this be removed? I don't know
 			if(packet_sequence_number == FINAL_SEQUENCE_NUMBER) {
 				break;
 			}
-			//TODO - this doesn't work with sequence range logic, fix this. What if packet_sequence_number==0, and window[0]==13?
 			if(packet_sequence_number < SR_window[0] && packet_sequence_number > SR_window[slidingWindowSize-1]) {
-				std::cout << "Packet " << packet_sequence_number << " lost the ack, resend" << std::endl;
-				
-				//TODO - this should be a sendAck function. Add this to packetIO.cpp
-				int ack_packet_size = (int) (sizeof(int) + sizeof(bool) + 1);
-				char ack_packet[ack_packet_size];
-				ack_packet[sizeof(int)+sizeof(bool)+1] = 6;//ACK value
-
-				//TODO - move everything here until sendAck() into sendAck(), it comes up multiple times
-				char packet_sequence_number_bytes[sizeof(int)];					
-				int temp_seq_num = packet_sequence_number;
-				
-				for (int i=sizeof(int)-1; i >= 0; i--) {
-					if(temp_seq_num - 127 > 0) {
-						packet_sequence_number_bytes[i] = 127;
-						temp_seq_num = temp_seq_num - 127;
-					} else if (temp_seq_num - 127 < 0){
-						packet_sequence_number_bytes[i] = temp_seq_num;
-						temp_seq_num = 0;
-					} else {
-						packet_sequence_number_bytes[i] = 0;
-					}
-				}
-				//write seqNum to ack
-				for(int i=0; i<sizeof(int); i++) {
-					ack_packet[i] = packet_sequence_number_bytes[i];
-				}
-				sendAck(serverSocket, ack_packet, packet_sequence_number);
+				std::cout << "Packet " << packet_sequence_number << " lost the ack, resend" << std::endl;				
+				sendAck(serverSocket, packet_sequence_number);
 
 				continue;
-				//TODO - reimplement this -> sendAck(serverSocket, packet_sequence_number);
 			}
 
             std::cout << "Packet " << packet_sequence_number << " recieved" << std::endl;
 
-			//TODO - if checksum fails, continue;
+			//TODO-CHECKSUM - if checksum fails, continue;
 
 			//find the index of the received packet, and send the ack
 			for (int i = 0; i < slidingWindowSize; i++) {
 				if (SR_window[i] == packet_sequence_number) {
-					//TODO - this should be a sendAck function. Add this to packetIO.cpp
-					int ack_packet_size = (int) (sizeof(int) + sizeof(bool) + 1);
-					char ack_packet[ack_packet_size];
-					ack_packet[ack_packet_size-1] = 6;//ACK value
-					
-					//TODO - move everything here until sendAck() into sendAck(), it comes up multiple times
-					char packet_sequence_number_bytes[sizeof(int)];					
-					int temp_seq_num = packet_sequence_number;
-					
-					for (int i=sizeof(int)-1; i >= 0; i--) {
-						if(temp_seq_num - 127 > 0) {
-							packet_sequence_number_bytes[i] = 127;
-							temp_seq_num = temp_seq_num - 127;
-						} else if (temp_seq_num - 127 < 0){
-							packet_sequence_number_bytes[i] = temp_seq_num;
-							temp_seq_num = 0;
-						} else {
-							packet_sequence_number_bytes[i] = 0;
-						}
-					}
-					//write seqNum to ack
-					for(int i=0; i<sizeof(int); i++) {
-						ack_packet[i] = packet_sequence_number_bytes[i];
-					}
+					sendAck(serverSocket, packet_sequence_number);
 
-					sendAck(serverSocket, ack_packet, packet_sequence_number);
-
-					//TODO - reimplement this -> sendAck(serverSocket, packet_sequence_number);
 					received_packet_contents[i] = packet_contents;
 					iterator++;
 					last_packet_num = SR_window[i];
@@ -238,7 +185,6 @@ void selectiveRepeatProtocol(int serverSocket, int clientSize) {
 				while (SR_window[0] == -2) {
 				//write the information to the file
 				
-				//TODO - is this working?
 				writePacketToFile(true, received_packet_contents[0], filePath);
 				//OPTIMIZE - while and for loop could be separated
 					for(int i=0; i<slidingWindowSize-1; i++){

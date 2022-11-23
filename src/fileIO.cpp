@@ -24,6 +24,7 @@ int openFile(const std::string& filePath) {
 
 }
 
+//NOTE: num_cycles became number of cycles * window size for simplicity.
 void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int seqNum, int num_cycles, int iterator, int packetSize, int fileSizeRangeOfSeqNums) {
 
     //create ifstream object
@@ -34,8 +35,8 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
 	int start = (seqNum + num_cycles) * packetSize;
     fileInputStream.seekg(start, std::ios_base::beg);
 	
-	std::cout << "The current number to read: " << start << std::endl;
-	std::cout << "The number of cycles: " << num_cycles << std::endl << std::endl << std::endl;
+	//std::cout << "The current number to read: " << start << std::endl;
+	//std::cout << "The number of cycles: " << num_cycles << std::endl << std::endl << std::endl;
 
     //create char array for seqNum int
     char seqNumBytes[sizeof(int)];
@@ -63,12 +64,6 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
     //create char array for file contents
     char contentsBytes[packetSize];
 
-	//TODO -> https://www.learncpp.com/cpp-tutorial/chars/ > ASCII character array for CPP
-	// Send EOT as last char, append onto the final packet. When that is received, check for each char==int(4). If true, EOT
-	// EOT is end of transmission character, it's perfect for what we need...
-	// Also, 6 is ack...? huh...
-	// just have the last char be >>>   char eot = 4;
-
     if(seqNum + 1 < fileSizeRangeOfSeqNums) {
         fileInputStream.read(contentsBytes, packetSize);
         int remainingBytes = fileSize - (seqNum * packetSize);
@@ -85,6 +80,7 @@ void writeFileToPacket(char packet[], const std::string& filePath, int fileSize,
 			contentsBytes[0] = 4;
 		}
 		
+		//TODO
 		std::cout << "Bytes became: " << std::endl;
 		for (int i=0; i<packetSize; i++) {
 			std::cout << contentsBytes[i] << ", int=" << int(contentsBytes[i]) << std::endl;
