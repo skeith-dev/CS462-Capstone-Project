@@ -25,7 +25,20 @@ int openFile(const std::string& filePath);
  * @param packetSize The size of the packet
  * @param numOfPackets The number of packets necessary to send the entire file
  */
-void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int iterator, int packetSize, int numOfPackets);
+void writeFileToPacketSW(char packet[], const std::string& filePath, int fileSize, int iterator, int packetSize, int numOfPackets);
+
+/**
+ *
+ * @param packet
+ * @param filePath
+ * @param fileSize
+ * @param seqNum
+ * @param packetSize
+ * @param fileSizeRangeOfSeqNums
+ */
+void writeFileToPacket(char packet[], const std::string& filePath, int fileSize, int seqNum, int num_cycles, int iterator, int packetSize, int fileSizeRangeOfSeqNums);
+
+void writePacketToFile(bool append, const std::string& message, const std::string& filePath);
 
 /**
  * Writes the final packet to be sent by the client socket

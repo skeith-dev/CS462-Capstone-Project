@@ -25,7 +25,7 @@ int userIntPrompt(const std::string& prompt, int min, int max) {
 
     int responseInt = std::stoi(responseString);
     while (responseInt < min || responseInt > max) {
-        std::cout << "Please enter a value between " << 0 << " and " << 1 << std::endl;
+        std::cout << "Please enter a value between " << min << " and " << max << std::endl;
         responseString.clear();
         std::getline(std::cin, responseString);
         responseInt = std::stoi(responseString);
@@ -57,6 +57,10 @@ float userFloatPrompt(const std::string& prompt, int min, int max) {
 bool userBoolPrompt(const std::string& prompt) {
 
     std::cout << prompt << std::endl;
+	
+	//TODO - does this work?
+	std::cin.clear();
+	std::cin.ignore(1);
 
     std::string responseString;
     std::getline(std::cin, responseString);
