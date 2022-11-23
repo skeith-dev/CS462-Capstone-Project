@@ -3,7 +3,9 @@
 //
 
 #include "sitErrors.h"
-
+#include <iostream>
+#include <vector>
+#include <algorithm>    // std::sort
 
 void generateRandomSitErrors(std::vector<int> &sitErrorsIterations) {
 
@@ -18,8 +20,8 @@ void generateRandomSitErrors(std::vector<int> &sitErrorsIterations) {
     }
 
     //remove duplicate elements from the vector
-    sort(sitErrorsIterations.begin(), sitErrorsIterations.end());
-    sitErrorsIterations.erase( unique(sitErrorsIterations.begin(), sitErrorsIterations.end() ), sitErrorsIterations.end() );
+    std::sort(sitErrorsIterations.begin(), sitErrorsIterations.end());
+    sitErrorsIterations.erase( std::unique(sitErrorsIterations.begin(), sitErrorsIterations.end() ), sitErrorsIterations.end() );
 
     std::cout << "Every iteration of each of the following packets will be dropped: ";
     for(int situationalErrorIndex : sitErrorsIterations) {
